@@ -1,0 +1,9 @@
+change_id,update,character,ability_id,change_type,old_value,new_value,designer_note
+P31-01,3.1,Isk,LYR-1,Buff,150 healing per pulse,180 healing per pulse,Isk was underpicked in long fights.
+P31-02,3.1,Marrow,OKO-1,Buff,220 damage,240 damage,Marrow lacked damage against grouped enemies.
+P31-03,3.1,All,,System,,Skill group boundaries set at 1400 and 2200 MMR,Matchmaking groups finalized.
+P32-01,3.2,Wren,,New character,,Added to limited test queue,Not yet in standard matchmaking.
+P32-02,3.2,Nyra,VEX-1,Buff,12 s cooldown,9 s cooldown,Nyra felt too punishable after diving.
+P32-03,3.2,Tollan,BRA-1,Buff,6% max health per nearby ally,9% max health per nearby ally,Rewards teams that group up around Tollan.
+P32-04,3.2,Isk,LYR-1,Nerf,180 healing per pulse,130 healing per pulse,"Isk was too strong in 3.1, especially in long team fights."
+P32-05,3.2,Fen,SAB-1,Bug fix,Projectile sometimes passed through targets,Projectile always collides,No number changes.

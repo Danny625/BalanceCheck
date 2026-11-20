@@ -1,0 +1,13 @@
+ability_id,character,ability,type,cooldown_s,key_value,key_value_unit,description
+VEX-1,Vex,Shadowstep,Mobility,9,450,dash range,Dash to a target location and become untargetable for 0.5 seconds.
+VEX-2,Vex,Severing Strike,Damage,14,380,damage,Heavy strike that deals bonus damage to targets below half health.
+BRA-1,Brannoc,Bulwark,Shield,18,9,% max health per nearby ally,Shields Brannoc and nearby allies. Shield grows with each ally in range.
+BRA-2,Brannoc,Earthbreaker,Crowd control,16,1.25,stun seconds,"Slams the ground, stunning enemies in a cone."
+LYR-1,Lyra,Mending Chorus,Healing,20,130,healing per pulse,Heals allies in an area for four pulses.
+LYR-2,Lyra,Hush,Crowd control,15,1.5,silence seconds,"Silences one enemy, preventing ability use."
+OKO-1,Okoro,Piercing Volley,Damage,10,240,damage,Fires arrows in a line that pass through all enemies hit.
+OKO-2,Okoro,Tumble,Mobility,12,300,dash range,Short roll that removes slows.
+SAB-1,Sable,Ember Lance,Damage,8,260,damage,Long-range fire projectile that explodes on the first target hit.
+SAB-2,Sable,Ashfield,Zone control,22,4,zone seconds,Creates a burning area that slows and damages enemies.
+QUI-1,Quill,Snare Glyph,Crowd control,13,1.0,root seconds,Places a hidden trap that roots the first enemy to step on it.
+QUI-2,Quill,Inkburst,Damage,11,210,damage,Explodes all active glyphs for area damage.

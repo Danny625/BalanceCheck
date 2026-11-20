@@ -1,0 +1,7 @@
+character,role,released_update,availability,description
+Vex,Assassin,1.0,Standard,"Mobile burst damage. Dashes in, eliminates one target, escapes."
+Brannoc,Tank,1.0,Standard,Frontline protector. Shields allies and holds space. Rewards team coordination.
+Lyra,Support,1.0,Standard,Healer. Keeps the team alive through sustained fights.
+Okoro,Marksman,2.0,Standard,"Long-range damage. Strong when protected, fragile when caught."
+Sable,Mage,2.4,Standard,Area damage and zone control.
+Quill,Specialist,3.2,Limited test queue,Trap-based area denial. Low match volume while in the test queue.

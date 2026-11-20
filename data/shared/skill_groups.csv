@@ -1,0 +1,4 @@
+skill_group,mmr_min,mmr_max,share_of_players
+Low,0,1399,0.4
+Mid,1400,2199,0.45
+High,2200,,0.15

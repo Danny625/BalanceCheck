@@ -1,0 +1,7 @@
+parameter,value,unit,meaning
+win_rate_min,0.46,ratio,Below this in any skill group flags a weak candidate
+win_rate_max,0.54,ratio,Above this in any skill group flags a strong candidate
+min_appearances,500,appearances per skill group per update,Below this the win rate is not reliable; action is Collect data
+pick_rate_max,0.3,ratio,Above this flags Monitor
+pick_rate_min,0.02,ratio,Below this flags Monitor
+max_priorities,3,count,Report returns at most this many priorities

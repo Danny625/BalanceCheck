@@ -1,0 +1,9 @@
+change_id,update,character,ability_id,change_type,old_value,new_value,designer_note
+P31-01,3.1,Lyra,LYR-1,Buff,150 healing per pulse,180 healing per pulse,Lyra was underpicked in long fights.
+P31-02,3.1,Okoro,OKO-1,Buff,220 damage,240 damage,Okoro lacked damage against grouped enemies.
+P31-03,3.1,All,,System,,Skill group boundaries set at 1400 and 2200 MMR,Matchmaking groups finalized.
+P32-01,3.2,Quill,,New character,,Added to limited test queue,Not yet in standard matchmaking.
+P32-02,3.2,Vex,VEX-1,Buff,12 s cooldown,9 s cooldown,Vex felt too punishable after diving.
+P32-03,3.2,Brannoc,BRA-1,Buff,6% max health per nearby ally,9% max health per nearby ally,Rewards teams that group up around Brannoc.
+P32-04,3.2,Lyra,LYR-1,Nerf,180 healing per pulse,130 healing per pulse,"Lyra was too strong in 3.1, especially in long team fights."
+P32-05,3.2,Sable,SAB-1,Bug fix,Projectile sometimes passed through targets,Projectile always collides,No number changes.

@@ -6,6 +6,7 @@
 - Uploads support the bundled game/roster, not arbitrary games. Guide/threshold changes require reviewed code/rules updates. Synchronization checks confirm supported numeric values and guide tokens, not every sentence's meaning.
 - Automated report validation checks references, sample eligibility, actions, and some prohibited wording. It cannot prove every claim, ranking, or next step is sound, or catch every numerical-change formulation. Human scoring is mandatory.
 - Multiple model requests per review consume quota. Fixed round/tool limits may stop a repetitive model. API failures are preserved, not disguised as successful reports.
+  The controller now moves directly to report generation once all required tools are complete, avoiding an extra model confirmation. This reduces requests but cannot remove Google's project limits. Quota errors preserve safe metric identifiers, limits, and retry delays when supplied; ambiguous errors remain explicitly ambiguous.
 - Numeric evidence is rendered directly from Python records instead of copied by the model. Interpretation errors remain possible.
 - The baseline places supported investigations ahead of data collection and monitoring. That mixed-action ordering is an explicit MVP interpretation for team review before evaluation.
 - No live prompt-injection resilience claim is justified by offline tests. Suspicious comments remain labeled untrusted evidence so real-model behavior can be evaluated.

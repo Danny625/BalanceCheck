@@ -156,6 +156,11 @@ if run:
                 st.write("• " + note)
     else:
         st.error(run.get("error", "The report failed validation and is not accepted as a recommendation."))
+        if run.get("diagnostic", {}).get("status_code") == "429":
+            st.markdown("[App owner: view active limits in Google AI Studio](https://aistudio.google.com/rate-limit)")
+            if run.get("quota"):
+                with st.expander("Google quota details"):
+                    st.json(run["quota"])
         if run.get("diagnostic"):
             st.caption("Connection diagnostic: " + json.dumps(run["diagnostic"]))
         for error in run["validation_errors"]:

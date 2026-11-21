@@ -112,6 +112,11 @@ def dispatch(evidence: Evidence, name: str, arguments: dict) -> dict:
     return getattr(evidence, name)(**arguments)
 
 
+def _missing_calls(required: list[tuple], calls: list[dict]) -> list[dict]:
+    return [{"name": name, "arguments": args} for name, args in required
+            if not any(c["name"] == name and c["arguments"] == args and "error" not in c["result"] for c in calls)]
+
+
 def validate_report(report: Report, evidence: Evidence, calls: list[dict]) -> list[str]:
     errors = []
     metrics = evidence.metric_index()
@@ -179,6 +184,48 @@ def plain(value):
     raise TypeError("Unexpected SDK response object.")
 
 
+def _quota_details(exc: Exception) -> dict:
+    """Keep only quota identifiers/values and retry timing, never raw requests."""
+    result = {}
+    violations = []
+
+    def inspect_payload(value):
+        if isinstance(value, list):
+            for item in value:
+                inspect_payload(item)
+        elif isinstance(value, dict):
+            for violation in value.get("violations", []):
+                if not isinstance(violation, dict):
+                    continue
+                entry = {name: violation[key] for name, keys in {
+                    "metric": ["quotaMetric", "quota_metric"], "id": ["quotaId", "quota_id"],
+                    "limit": ["quotaValue", "quota_value"]}.items()
+                         for key in keys if key in violation and isinstance(violation[key], (str, int, float))}
+                if entry and entry not in violations:
+                    violations.append(entry)
+            delay = value.get("retryDelay", value.get("retry_delay"))
+            if isinstance(delay, str) and re.fullmatch(r"\d+(?:\.\d+)?s", delay):
+                result["retry_after_seconds"] = float(delay[:-1])
+            for key in ["error", "details"]:
+                if key in value:
+                    inspect_payload(value[key])
+
+    current = exc
+    for _ in range(5):
+        if current is None:
+            break
+        for attribute in ["body", "response_json", "details"]:
+            inspect_payload(getattr(current, attribute, None))
+        current = current.__cause__
+    if violations:
+        result["violations"] = violations
+        identifiers = " ".join(str(v.get("id", "")) + " " + str(v.get("metric", "")) for v in violations).lower()
+        result["limit_kind"] = ("daily" if "perday" in identifiers or "daily" in identifiers
+                                else "short_term" if "perminute" in identifiers or "persecond" in identifiers else "unknown")
+        result["zero_allowance"] = any(str(v.get("limit")) in ["0", "0.0"] for v in violations)
+    return result
+
+
 def _api_error(exc: Exception) -> str:
     # Never display raw provider exceptions: they can include credentials or request content.
     code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
@@ -203,7 +250,16 @@ def _api_error(exc: Exception) -> str:
     if str(code) in ["401", "403"]:
         return "Gemini rejected access. Check the replacement key and project permissions in AI Studio."
     if str(code) == "429":
-        return "Gemini quota/rate limit reached. Check free-tier availability in AI Studio and try later. No baseline was substituted."
+        quota = _quota_details(exc)
+        if quota.get("zero_allowance"):
+            return "Google reports zero available quota for this model/project. The app owner needs to check access and active limits in AI Studio; waiting alone may not resolve it."
+        if quota.get("limit_kind") == "daily":
+            return "The shared Google project's daily Gemini allowance is exhausted. Try after Google's daily quota reset; the app owner can check the project's active limits."
+        if quota.get("retry_after_seconds"):
+            return f"The shared app reached a Gemini quota/rate limit. Google advises waiting {quota['retry_after_seconds']:g} seconds before retrying."
+        if quota.get("limit_kind") == "short_term":
+            return "The shared app reached Gemini's short-term request/token limit. Pause before retrying; all visitors using this Google project share its allowance."
+        return "Gemini blocked this request because a quota or rate limit was reached. The app owner should check active project limits in AI Studio to identify which allowance was exceeded."
     if str(code) in ["500", "502", "503", "504"]:
         return "Google's model service returned a server error or gateway timeout. This is not a confirmed key/billing error. Try again later or ask the app owner to test another available model."
     if str(code) == "404":
@@ -248,12 +304,12 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
            "working_tree_dirty": dirty, "code_hashes": code_hashes,
            "instructions_sha256": sha256(instructions.encode()).hexdigest(), "input_hashes": evidence.hashes,
            "status": "running", "tool_calls": [], "raw_outputs": [], "report": None,
-           "validation_errors": [], "baseline": statistics_baseline(evidence)}
+           "validation_errors": [], "model_requests": 0, "baseline": statistics_baseline(evidence)}
     current_characters = sorted(set(evidence.stats.loc[evidence.stats["update"] == CURRENT, "character"]))
     required_calls = [("get_review_rules", {}), ("get_performance", {})]
     required_calls += [(name, {"character": character}) for character in current_characters
                        for name in ["get_character_context", "get_feedback"]]
-    history = [{"type": "user_input", "content": [{"type": "text", "text": "Review the supplied scenario for the current update. Retrieve rules and all performance first, then context and feedback for every character with current records. After completing those lookups, say READY; the next turn requests the structured report."}]}]
+    history = [{"type": "user_input", "content": [{"type": "text", "text": "Review the supplied scenario for the current update. Retrieve rules and all performance first, then context and feedback for every character with current records. The application will request the structured report once all required evidence is retrieved."}]}]
     owned_client = client is None
     try:
         if owned_client:
@@ -263,6 +319,7 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
         for turn in range(max_rounds):
             if progress:
                 progress(f"Gathering evidence · round {turn + 1}")
+            run["model_requests"] += 1
             response = client.interactions.create(model=model, input=history, system_instruction=instructions,
                                                  tools=tool_declarations(), store=False, timeout=60,
                                                  generation_config={"max_output_tokens": 4096})
@@ -274,8 +331,7 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
                 run["raw_outputs"].append({"phase": "gather", "text": text})
             function_calls = [s for s in steps if s.get("type") == "function_call"]
             if not function_calls:
-                missing = [{"name": name, "arguments": args} for name, args in required_calls
-                           if not any(c["name"] == name and c["arguments"] == args and "error" not in c["result"] for c in run["tool_calls"])]
+                missing = _missing_calls(required_calls, run["tool_calls"])
                 if not missing:
                     ready = True
                     break
@@ -294,11 +350,15 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
                     progress(f"Retrieved {name}" + (f" · {args['character']}" if isinstance(args, dict) and args.get("character") else ""))
                 history.append({"type": "function_result", "name": name, "call_id": call["id"],
                                 "result": [{"type": "text", "text": json.dumps(result, allow_nan=False)}]})
+            if not _missing_calls(required_calls, run["tool_calls"]):
+                ready = True
+                break
         if not ready:
             raise ReviewLimitError("Evidence-gathering limit reached. No report was accepted.")
         if progress:
             progress("Writing the evidence-backed report")
         history.append({"type": "user_input", "content": [{"type": "text", "text": "Return the final report in the supplied JSON schema, using only retrieved evidence. Do not add numerical rate/count claims in prose; exact values will be displayed from metric_refs."}]})
+        run["model_requests"] += 1
         final = client.interactions.create(model=model, input=history, system_instruction=instructions,
                                            store=False, timeout=60, generation_config={"max_output_tokens": 8192},
                                            response_format={"type": "text", "mime_type": "application/json", "schema": Report.model_json_schema()})
@@ -320,6 +380,8 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
         run["diagnostic"] = {"exception_type": type(exc).__name__,
                              "status_code": str(getattr(exc, "status_code", None) or getattr(exc, "code", None) or "unavailable"),
                              "cause_type": type(exc.__cause__).__name__ if exc.__cause__ else None}
+        if run["diagnostic"]["status_code"] == "429":
+            run["quota"] = _quota_details(exc)
     finally:
         if owned_client and client is not None:
             try:

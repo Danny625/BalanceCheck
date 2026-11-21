@@ -130,7 +130,7 @@ For a browser link without per-user keys, deploy this same repository to Streaml
 | --- | --- |
 | Run button disabled | Enter a Gemini key or configure a server key. |
 | Access rejected | Check the replacement key and project permissions in AI Studio. |
-| Quota reached | Check model/project limits in AI Studio and wait; this app never upgrades billing automatically. |
+| Quota reached | Open the project's [active limits](https://aistudio.google.com/rate-limit). Check whether requests/tokens per minute or a daily allowance was exceeded. Follow Google's reported retry delay when present. A new key in the same project does not reset shared quota. |
 | Model unavailable | Select an accessible model supporting function calling and structured outputs. |
 | Invalid report | Download/preserve the original JSON; inspect validation errors before changing code or prompts. |
 | Upload rejected | Check column names, counts, roster, skill groups, and size. |

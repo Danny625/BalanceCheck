@@ -36,7 +36,7 @@ def test_real_sdk_serializes_tool_round_trip_and_structured_report():
         transport.close()
         client.close()
     assert result["status"] == "valid", result
-    assert len(requests) == 3
+    assert len(requests) == 2
     assert all(request["store"] is False for request in requests)
     assert "function_result" in json.dumps(requests[1]["input"])
     assert requests[-1]["response_format"]["mime_type"] == "application/json"
@@ -56,3 +56,26 @@ def test_model_metadata_check_uses_real_sdk_without_generation(monkeypatch):
     result = check_connection("offline-metadata-placeholder")
     assert result["ok"] and result["selected_model_listed"]
     assert len(requests) == 1 and requests[0].method == "GET"
+
+
+def test_actual_sdk_quota_error_retains_only_safe_limit_metadata():
+    def respond(request):
+        return httpx.Response(429, headers={"content-type": "application/json"}, json={"error": {
+            "code": 429, "status": "RESOURCE_EXHAUSTED", "message": "Quota exceeded",
+            "details": [{"@type": "type.googleapis.com/google.rpc.QuotaFailure", "violations": [{
+                "quotaId": "GenerateRequestsPerMinutePerProjectPerModel", "quotaValue": "20",
+                "quotaDimensions": {"project": "private-project"}}]},
+                {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "30s"}]}})
+
+    client = genai.Client(api_key="offline-quota-placeholder", http_options={"retry_options": {"attempts": 1}})
+    transport = httpx.Client(transport=httpx.MockTransport(respond))
+    client.interactions.sdk_configuration.client = transport
+    try:
+        result = review(load_scenario(), "offline-quota-placeholder", client=client)
+    finally:
+        transport.close()
+        client.close()
+    assert result["diagnostic"]["status_code"] == "429"
+    assert result["quota"]["retry_after_seconds"] == 30
+    assert result["quota"]["violations"][0]["limit"] == "20"
+    assert "private-project" not in json.dumps(result)

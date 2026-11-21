@@ -139,3 +139,37 @@ def test_healthy_group_comparisons_do_not_invalidate_high_only_investigation():
     assert not validate_report(Report.model_validate(body), e, calls)
     body["priorities"][0]["affected_skill_groups"] = ["Low", "High"]
     assert any("ordinary" in message for message in validate_report(Report.model_validate(body), e, calls))
+
+
+@pytest.mark.parametrize("quota_id,limit,expected", [
+    ("GenerateRequestsPerMinutePerProjectPerModel", "20", "short-term"),
+    ("GenerateRequestsPerDayPerProjectPerModel", "100", "daily"),
+    ("GenerateRequestsPerDayPerProjectPerModel", "0", "zero available"),
+])
+def test_quota_failures_preserve_safe_limits_and_clear_guidance(quota_id, limit, expected):
+    class QuotaError(Exception):
+        status_code = 429
+        body = {"error": {"details": [{"violations": [{"quotaId": quota_id, "quotaValue": limit,
+                                                         "quotaDimensions": {"project": "private-project"}}]}]}}
+
+    class LimitedClient(FakeClient):
+        def create(self, **kwargs):
+            raise QuotaError("provider request contains test-only-placeholder")
+
+    run = review(load_scenario(), "test-only-placeholder", client=LimitedClient())
+    assert run["status"] == "error"
+    assert expected in run["error"]
+    assert run["model_requests"] == 1
+    assert run["quota"]["violations"][0]["limit"] == limit
+    assert "private-project" not in json.dumps(run)
+    assert "test-only-placeholder" not in json.dumps(run)
+
+
+def test_provider_retry_delay_is_reported_without_retrying():
+    from agent import _api_error
+
+    class QuotaError(Exception):
+        status_code = 429
+        body = {"error": {"details": [{"retryDelay": "32.5s"}]}}
+
+    assert "32.5 seconds" in _api_error(QuotaError())

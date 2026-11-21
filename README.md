@@ -7,7 +7,7 @@ Team: Scott Shu, Elizabeth Hsu, Danny Weng.
 
 ## Current status
 
-Planning and supplied inputs only. The agent and interface have not been implemented, and no model evaluations have been run. This repository is not yet the working midpoint submission.
+The local app, Python metrics/evidence tools, Gemini agent loop, downloads, and evaluation runner are implemented. Live Gemini verification is in progress; no measured model hit rate is claimed. The answer key is a draft for team review. This is not yet the complete midpoint submission.
 
 ## Start here
 
@@ -18,6 +18,9 @@ Planning and supplied inputs only. The agent and interface have not been impleme
 - [Synthetic data inventory](data/README.md)
 - [Game guide](data/shared/game_guide.md)
 - [AI use log](docs/ai_use_log.md)
+- [Known weaknesses](docs/known_weaknesses.md)
+- [Evaluation and scoring instructions](evaluation/README.md)
+- [Sources](docs/sources.md)
 
 ## Planned experience
 
@@ -33,8 +36,97 @@ The original data package is under `data/`, including shared references, a pract
 
 Use `00_practice` for development. Keep evaluation answer keys and the data README out of the agent's evidence. Freeze evaluation criteria before running held-out cases; log all subsequent changes and reruns.
 
-## Running and access
+## Run locally
 
-There is no runnable application yet. Setup commands, exact dependencies, model configuration, and verified reviewer instructions will be added with the implementation. API credentials must never be committed. The final handoff must include a working reviewer-access arrangement, not merely a request for reviewers to find their own credentials.
+You need Python 3.12 or newer (tested with 3.14), internet access, and a Gemini API key. You do not need a Streamlit account for local use.
+
+1. Download this repository using **Code → Download ZIP**, then unzip it. GitHub Desktop is another option.
+2. On a Mac with Python installed, double-click `Launch.command`. The first launch installs dependencies into the project environment. If macOS blocks it, use the terminal steps below.
+3. Open the localhost link shown in the terminal, usually `http://localhost:8501`.
+4. Enter your Gemini API key in the sidebar password field, select `00_practice`, and click **Run AI review**.
+5. Read the priorities, expand the tool/evidence log, and download the report or complete JSON run record. Keep the terminal running; Control+C stops the app.
+
+Install Python from [python.org](https://www.python.org/downloads/) if necessary. Obtain a Gemini key from [Google AI Studio](https://aistudio.google.com/apikey). A ChatGPT/OpenAI key is not a Gemini credential.
+
+### Terminal setup: Mac/Linux
+
+Open a terminal in the downloaded repository folder:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+### Terminal setup: Windows PowerShell
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m streamlit run app.py
+```
+
+Windows/cloud setup have not yet been independently verified.
+
+### Save the key once (optional)
+
+Copy `.env.example` to `.env.local` and fill in `GEMINI_API_KEY` locally. That file is ignored by Git. Environment variables and Streamlit app secrets are also supported. With a server key configured, users do not need to enter their own key. The password field is session-only; keys are excluded from reports and run logs.
+
+The configurable default model is `gemini-4-hydrogen`, listed with a free API tier when checked November 20, 2026. Quotas and model availability depend on your project. The app does not enable billing, but cannot guarantee zero cost on a project with paid billing already enabled. Change the model in sidebar settings or `GEMINI_MODEL` if needed.
+
+## Application files
+
+| File | Job |
+| --- | --- |
+| `app.py` | Streamlit screen, uploads, Run button, report display/downloads. |
+| `data.py` | CSV validation, Pandas calculations, four read-only evidence tools, statistics baseline. |
+| `agent.py` | Gemini tool loop, structured report checks, reproducible run records. |
+| `instructions.md` | Agent task, boundaries, and evidence-handling rules. |
+| `evaluate.py` | Run the same agent for frozen cases and summarize human scoring. |
+
+The model can request rules, performance, character context, and feedback. Python executes only those tools against the selected scenario. No database, separate frontend/backend, agent framework, game-modifying tools, or live player integrations are used.
+
+## Uploads and failures
+
+Upload mode uses the bundled Shardfall Arena roster, references, and guide. Custom games are outside scope. Use UTF-8 CSVs, at most 2 MB/10,000 rows each:
+
+```text
+stats.csv: character,update,skill_group,wins,appearances,picks,eligible_selections
+feedback.csv: comment_id,author_id,character,update,skill_level,text
+```
+
+Use Low/Mid/High groups and include current update 3.2. Leave missing counts blank. Missing denominators remain unavailable; impossible counts and unknown roster names produce input errors. Source CSVs are never overwritten.
+
+Reports include up to three priorities, exact Python evidence, uncertainty, and next steps. Failed evidence/schema validation is visibly unaccepted. Failed API calls never silently become baseline reports. Human review remains necessary for semantic correctness.
+
+Original outputs, tool results, model, timestamps, input/code hashes, and validation results are saved under ignored `runs/` and available as downloads. Preserve invalid reports as failure evidence. Share selected synthetic records deliberately.
+
+## Check the software and evaluate the agent
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+python evaluate.py --all-evaluation --baseline-only
+```
+
+Software tests use test doubles and mock HTTP, not real model outputs. The baseline command makes no API calls and does not measure agent accuracy. Read [evaluation/README.md](evaluation/README.md) before live evaluation: the team must review and freeze keys first, run thirteen executions for ten logical cases, score with two reviewers, and preserve failures verbatim.
+
+## Peer access and deployment
+
+The localhost link only works on the computer running the app. The private repository requires accepted collaborator invitations. Before midpoint handoff, arrange a working reviewer sandbox/credential and verify setup using only these instructions. A repository URL alone does not grant access.
+
+For a browser link without per-user keys, deploy this same repository to Streamlit Community Cloud, select `app.py`, and configure `GEMINI_API_KEY` in private app secrets. Deployment is optional and has not been performed. Never commit keys or put them in screenshots. The final handoff must include working access, not merely ask peers to find their own credentials.
+
+## Troubleshooting
+
+| Symptom | Next step |
+| --- | --- |
+| Run button disabled | Enter a Gemini key or configure a server key. |
+| Access rejected | Check the replacement key and project permissions in AI Studio. |
+| Quota reached | Check model/project limits in AI Studio and wait; this app never upgrades billing automatically. |
+| Model unavailable | Select an accessible model supporting function calling and structured outputs. |
+| Invalid report | Download/preserve the original JSON; inspect validation errors before changing code or prompts. |
+| Upload rejected | Check column names, counts, roster, skill groups, and size. |
 
 GitHub stores the project; it does not run the app. The MVP will run locally from this repository. A hosted URL is optional because the assignment permits a repository with accessible instructions and credentials/sandbox where needed.

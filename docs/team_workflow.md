@@ -16,4 +16,4 @@ Do not commit API credentials or private player data. Keep evaluation keys and t
 
 ## Current repository status
 
-This initial version contains plans and supplied inputs. No application, model connection, or measured test results exist yet. Consult the build checklist for the next implementation milestone.
+The repository includes the local app, Gemini connection, software tests, and evaluation tools. Live-model verification and formal evaluation remain outstanding. Consult the checklist before reporting midpoint readiness.

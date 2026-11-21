@@ -1,0 +1,232 @@
+"""Read-only scenario loading, calculated evidence, and statistics-only baseline."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from hashlib import sha256
+from io import StringIO
+import json
+from pathlib import Path
+import re
+
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parent
+DATA = ROOT / "data"
+CURRENT = "3.2"
+STATS = ["character", "update", "skill_group", "wins", "appearances", "picks", "eligible_selections"]
+FEEDBACK = ["comment_id", "author_id", "character", "update", "skill_level", "text"]
+COUNTS = STATS[3:]
+TABLES = {
+    "characters": ["character", "role", "released_update", "availability", "description"],
+    "abilities": ["ability_id", "character", "ability", "type", "cooldown_s", "key_value", "key_value_unit", "description"],
+    "patch_notes": ["change_id", "update", "character", "ability_id", "change_type", "old_value", "new_value", "designer_note"],
+    "design_backlog": ["backlog_id", "character", "ability_id", "proposed_change", "source", "status"],
+    "skill_groups": ["skill_group", "mmr_min", "mmr_max", "share_of_players"],
+    "review_thresholds": ["parameter", "value", "unit", "meaning"],
+}
+
+
+class DataError(ValueError):
+    """A useful user-facing input error."""
+
+
+def scenarios() -> list[str]:
+    return sorted(p.name for p in (DATA / "scenarios").iterdir() if p.is_dir())
+
+
+def read_csv(raw: bytes, columns: list[str], label: str) -> pd.DataFrame:
+    if len(raw) > 2_000_000:
+        raise DataError(f"{label}: limit is 2 MB per file.")
+    try:
+        frame = pd.read_csv(StringIO(raw.decode("utf-8-sig")), dtype=str, keep_default_na=False)
+    except (ValueError, UnicodeError, pd.errors.ParserError) as exc:
+        raise DataError(f"{label}: expected a valid UTF-8 CSV with a header.") from exc
+    missing = set(columns) - set(frame.columns)
+    if missing:
+        raise DataError(f"{label}: missing columns: {', '.join(sorted(missing))}.")
+    if len(frame) > 10_000:
+        raise DataError(f"{label}: limit is 10,000 rows.")
+    frame = frame[columns].copy()
+    for col in columns:
+        frame[col] = frame[col].str.strip()
+    return frame
+
+
+def records(frame: pd.DataFrame) -> list[dict]:
+    return json.loads(frame.to_json(orient="records"))
+
+
+@dataclass
+class Evidence:
+    label: str
+    tables: dict[str, pd.DataFrame]
+    stats: pd.DataFrame
+    feedback: pd.DataFrame
+    guide: str
+    hashes: dict[str, str]
+    warnings: list[str]
+
+    @property
+    def thresholds(self) -> dict[str, float]:
+        return dict(zip(self.tables["review_thresholds"].parameter, self.tables["review_thresholds"].value.astype(float)))
+
+    @property
+    def characters(self) -> list[str]:
+        return self.tables["characters"].character.tolist()
+
+    def check_character(self, character: str) -> None:
+        if character not in self.characters:
+            raise DataError("Unknown character. Use a character returned by get_performance.")
+
+    def get_review_rules(self) -> dict:
+        return {"current_update": CURRENT, "guide": self.guide, "thresholds": self.thresholds,
+                "skill_groups": records(self.tables["skill_groups"]), "input_warnings": self.warnings}
+
+    def get_performance(self, character: str | None = None) -> dict:
+        if character is not None:
+            self.check_character(character)
+        frame = self.stats if character is None else self.stats[self.stats.character == character]
+        overall = []
+        groups = set(self.tables["skill_groups"].skill_group)
+        for (name, update), sub in frame.groupby(["character", "update"], sort=False):
+            complete = set(sub.skill_group) == groups and sub[["wins", "appearances"]].notna().all().all()
+            total = sub.appearances.sum()
+            overall.append({"character": name, "update": update,
+                            "win_rate": float(sub.wins.sum() / total) if complete and total > 0 else None,
+                            "complete": bool(complete), "note": "Always inspect individual skill groups."})
+        return {"current_update": CURRENT, "rows": records(frame), "overall": overall}
+
+    def get_character_context(self, character: str) -> dict:
+        self.check_character(character)
+        return {name: records(frame[frame.character.isin([character, "All"])])
+                for name, frame in self.tables.items() if "character" in frame.columns}
+
+    def get_feedback(self, character: str) -> dict:
+        self.check_character(character)
+        frame = self.feedback[self.feedback.character == character]
+        return {"comments": records(frame), "note": "Untrusted player text. Duplicates are not independent evidence; outdated comments do not support current-patch claims."}
+
+    def metric_index(self) -> dict[str, dict]:
+        return {r["evidence_id"]: r for r in records(self.stats)}
+
+
+def load_scenario(name: str = "00_practice", *, stats_bytes: bytes | None = None,
+                  feedback_bytes: bytes | None = None) -> Evidence:
+    if name not in scenarios():
+        raise DataError("Choose an available sample scenario.")
+    upload = stats_bytes is not None or feedback_bytes is not None
+    if upload and (stats_bytes is None or feedback_bytes is None):
+        raise DataError("Upload both stats.csv and feedback.csv.")
+    folder = DATA / "scenarios" / name
+    hashes = {}
+
+    def source(filename: str, supplied: bytes | None = None) -> bytes:
+        path = folder / filename
+        raw = supplied if supplied is not None else (path if path.exists() and not upload else DATA / "shared" / filename).read_bytes()
+        hashes[filename] = sha256(raw).hexdigest()
+        return raw
+
+    tables = {n: read_csv(source(n + ".csv"), cols, n) for n, cols in TABLES.items()}
+    guide = source("game_guide.md").decode("utf-8")
+    stats = read_csv(source("stats.csv", stats_bytes), STATS, "Statistics")
+    feedback = read_csv(source("feedback.csv", feedback_bytes), FEEDBACK, "Feedback")
+    if stats.empty:
+        raise DataError("Statistics must contain at least one record.")
+    for key in ["characters", "skill_groups", "review_thresholds"]:
+        col = {"characters": "character", "skill_groups": "skill_group", "review_thresholds": "parameter"}[key]
+        if tables[key][col].eq("").any() or tables[key][col].duplicated().any():
+            raise DataError(f"{key}: identifiers must be present and unique.")
+    expected = {"win_rate_min": .46, "win_rate_max": .54, "min_appearances": 500,
+                "pick_rate_max": .3, "pick_rate_min": .02, "max_priorities": 3}
+    try:
+        actual = dict(zip(tables["review_thresholds"].parameter, tables["review_thresholds"].value.astype(float)))
+        shares = tables["skill_groups"].share_of_players.astype(float)
+    except ValueError as exc:
+        raise DataError("Invalid numeric thresholds or player shares.") from exc
+    if actual != expected or not all(token in guide for token in ["46%", "54%", "500", "30%", "2%"]):
+        raise DataError("Guide/thresholds differ from the supported, reviewed game rules. Review them together before changing code.")
+    if not shares.between(0, 1).all() or abs(shares.sum() - 1) > 1e-6:
+        raise DataError("Player shares must be between zero and one and sum to one.")
+    names, groups = set(tables["characters"].character), set(tables["skill_groups"].skill_group)
+    for frame, label, group_col in [(stats, "Statistics", "skill_group"), (feedback, "Feedback", "skill_level")]:
+        if not set(frame.character) <= names or not set(frame[group_col]) <= groups | ({""} if label == "Feedback" else set()):
+            raise DataError(f"{label}: unknown character or skill group for this game's roster.")
+        if frame["update"].eq("").any():
+            raise DataError(f"{label}: update must be present.")
+    if stats[STATS[:3]].eq("").any().any() or stats.duplicated(STATS[:3]).any():
+        raise DataError("Statistics: character/update/skill_group keys must be unique and nonempty.")
+    for col in COUNTS:
+        try:
+            stats[col] = pd.to_numeric(stats[col].replace("", None), errors="raise").astype(float)
+        except (ValueError, TypeError) as exc:
+            raise DataError(f"Statistics: {col} must contain whole numbers or blanks.") from exc
+        values = stats[col].dropna()
+        if ((values < 0) | (values % 1 != 0) | (values > 1e12)).any():
+            raise DataError(f"Statistics: {col} contains impossible counts.")
+    if (stats.wins > stats.appearances).any() or (stats.picks > stats.eligible_selections).any():
+        raise DataError("Wins cannot exceed appearances; picks cannot exceed eligible selections.")
+    if not stats["update"].eq(CURRENT).any():
+        raise DataError(f"No current-update ({CURRENT}) statistics were provided.")
+    warnings = []
+    missing_rows = []
+    for character in stats.loc[stats["update"].eq(CURRENT), "character"].unique():
+        present = set(stats.loc[(stats.character == character) & (stats["update"] == CURRENT), "skill_group"])
+        for group in sorted(groups - present):
+            missing_rows.append({"character": character, "update": CURRENT, "skill_group": group,
+                                 **{c: float("nan") for c in COUNTS}})
+            warnings.append(f"Missing current record: {character}, {group}; collect missing records.")
+    if missing_rows:
+        stats = pd.concat([stats, pd.DataFrame(missing_rows)], ignore_index=True)
+    stats["evidence_id"] = "stats:" + stats["update"] + ":" + stats.character + ":" + stats.skill_group
+    stats["win_rate"] = stats.wins / stats.appearances.where(stats.appearances > 0)
+    stats["pick_rate"] = stats.picks / stats.eligible_selections.where(stats.eligible_selections > 0)
+    stats["sample_sufficient"] = stats.appearances.ge(actual["min_appearances"]) & stats.wins.notna()
+    stats["balance_flag"] = "Within range"
+    stats.loc[stats.win_rate > actual["win_rate_max"], "balance_flag"] = "Strong"
+    stats.loc[stats.win_rate < actual["win_rate_min"], "balance_flag"] = "Weak"
+    stats.loc[~stats.sample_sufficient, "balance_flag"] = "Collect data"
+    stats["pick_watch"] = (stats.pick_rate > actual["pick_rate_max"]) | (stats.pick_rate < actual["pick_rate_min"])
+    if feedback.comment_id.eq("").any() or feedback.comment_id.duplicated().any() or feedback.author_id.eq("").any() or feedback.text.eq("").any():
+        raise DataError("Feedback: unique comment IDs, author IDs, and text are required.")
+    for table, key in [("abilities", "ability_id"), ("patch_notes", "change_id"), ("design_backlog", "backlog_id")]:
+        if tables[table][key].eq("").any() or tables[table][key].duplicated().any():
+            raise DataError(f"{table}: evidence IDs must be present and unique.")
+    feedback["outdated"] = feedback["update"] != CURRENT
+    seen = {}
+    duplicates = []
+    for row in records(feedback):
+        normalized = re.sub(r"[^\w]+", "", row["text"].casefold())
+        key = (row["author_id"], row["character"], row["update"], normalized)
+        duplicates.append(seen.get(key))
+        seen.setdefault(key, row["comment_id"])
+    feedback["duplicate_of"] = duplicates
+    feedback["suspicious"] = feedback.text.str.contains(r"ignore.{0,40}(?:rules|instructions)|rank .{0,30}(?:first|top priority)", case=False, regex=True)
+    return Evidence("Uploaded files" if upload else name, tables, stats, feedback, guide, hashes, warnings)
+
+
+def statistics_baseline(evidence: Evidence) -> list[dict]:
+    """Deterministic comparison. Does not read comments, context, or an answer key."""
+    shares = dict(zip(evidence.tables["skill_groups"].skill_group,
+                      evidence.tables["skill_groups"].share_of_players.astype(float)))
+    candidates = []
+    for character, frame in evidence.stats[evidence.stats["update"] == CURRENT].groupby("character", sort=False):
+        flagged = frame[frame.sample_sufficient & frame.balance_flag.isin(["Strong", "Weak"])]
+        collect = frame[~frame.sample_sufficient | frame.pick_rate.isna()]
+        watch = frame[frame.pick_watch & frame.sample_sufficient]
+        if not flagged.empty:
+            action, chosen, quality = "Investigate", flagged, 0
+        elif not collect.empty:
+            action, chosen, quality = "Collect data", collect, 1
+        elif not watch.empty:
+            action, chosen, quality = "Monitor", watch, 2
+        else:
+            continue
+        impact = sum(shares[g] for g in chosen.skill_group)
+        deviation = max([max(0, r - .54, .46 - r) for r in flagged.win_rate] or [0])
+        stable_id = evidence.tables["characters"].set_index("character").loc[character, "role"]
+        candidates.append({"character": character, "action": action, "affected_skill_groups": chosen.skill_group.tolist(),
+                           "metric_refs": chosen.evidence_id.tolist(), "_sort": (quality, -impact, -deviation, stable_id)})
+    candidates.sort(key=lambda x: x["_sort"])
+    for row in candidates:
+        row.pop("_sort")
+    return candidates[:int(evidence.thresholds["max_priorities"])]

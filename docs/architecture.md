@@ -1,10 +1,10 @@
 # Simplest architecture
 
-Status: proposed design, not implemented. Based on the supplied proposal, midpoint instructions, spec, and mock data.
+Status: implemented locally with Gemini; live-model verification and formal evaluation remain pending. Based on the supplied project material.
 
 ## One application
 
-Use Python, Pandas, Streamlit, and one hosted model through an API. Run everything except the model in a single Python process. Use CSV/Markdown files as storage. No database, separate frontend/backend, agent framework, vector database, live game integration, or model training is needed.
+Use Python, Pandas, Streamlit, and Gemini through its API. Run everything except the model in a single Python process. Use CSV/Markdown files as storage. No database, separate frontend/backend, agent framework, vector database, live game integration, or model training is needed.
 
 ```text
 Browser: scenario picker / CSV upload → Run review
@@ -23,7 +23,7 @@ Browser: scenario picker / CSV upload → Run review
 
 ## Only three application files
 
-| Planned file | Responsibility |
+| File | Responsibility |
 | --- | --- |
 | `app.py` | Streamlit controls, input errors, progress, report display, downloadable report, expandable tool/evidence log. Calls the other two modules. |
 | `data.py` | Scenario loading, shared-file overrides, input validation, Pandas calculations, evidence IDs, feedback flags, and read-only evidence functions. Also supports the statistics-only comparison. |
@@ -31,14 +31,14 @@ Browser: scenario picker / CSV upload → Run review
 
 Keep the four read-only tools in `data.py`; separate files for every tool are unnecessary. Keep report validation in `agent.py` until complexity warrants extraction.
 
-Supporting files to add during implementation:
+Supporting implementation files:
 
 - `instructions.md`: agent task, guide-following behavior, untrusted-comment boundary, and report requirements.
 - `requirements.txt`: exact tested dependencies.
 - `.env.example`: empty configuration template; the real credential file remains ignored.
 - `evaluate.py`: calls the same review function as the UI for each frozen scenario.
 - `tests/test_data.py`: meaningful checks for calculations, missing records, overrides, and duplicate handling.
-- `evaluation/answer_key.json`: human-reviewed acceptable outcomes and scoring rules, never model input.
+- `evaluation/answer_key.json`: draft acceptable outcomes and scoring rules awaiting human review, never model input.
 - `evaluation/results/`: original outputs, tool logs, scoring, failures, baseline comparison, and run metadata. Save each run separately.
 
 ## Input loading
@@ -92,3 +92,7 @@ The output is advisory. The human reads it and approves or rejects investigation
 ## Reviewer access
 
 Choose the assignment's repository option first. Before submission, provide tested plain-language installation/run instructions and privately arrange a working reviewer sandbox credential if credentials are needed. Never publish a credential in GitHub or require a peer to obtain access without guidance. Optional deployment can reuse the same app; it is not a prerequisite for building the agent.
+
+## Build adjustments
+
+Gemini supplies the hosted model. Its Interactions API uses stateless history (store=False), bounded tool calls, and a separate schema-constrained final response. Numeric evidence is rendered directly from Python records. Raw local runs are saved under ignored runs/; formal evaluation records use timestamped evaluation/results/ folders. These adjustments preserve the three-file design.

@@ -86,7 +86,6 @@ with st.sidebar:
         st.caption("Uploads use the bundled Shardfall Arena roster and guide. Custom games are outside this prototype.")
         stats_upload = st.file_uploader("Statistics CSV", type=["csv"])
         feedback_upload = st.file_uploader("Feedback CSV", type=["csv"])
-    st.caption("Practice: 00_practice. Evaluation: freeze answer keys before running the other scenarios.")
 
 if mode == "Upload CSVs" and (stats_upload is None or feedback_upload is None):
     st.info("Upload both files to begin. Expand the input format below for required columns.")
@@ -119,12 +118,7 @@ for warning in evidence.warnings:
 if not configured_key:
     st.info("Data is ready. The app owner must complete model setup to enable AI reviews. You can inspect inputs and the statistics-only baseline below without a key.")
 
-key_status = json.loads((ROOT / "evaluation" / "answer_key.json").read_text())["status"]
-held_out_locked = mode == "Sample scenario" and sample != "00_practice" and key_status != "frozen"
-if held_out_locked:
-    st.warning("This is a held-out evaluation scenario. The team must review, freeze, and commit evaluation/answer_key.json before running the AI on it. You can still inspect its inputs and baseline.")
-
-if st.button("Run AI review", type="primary", disabled=not configured_key or held_out_locked, key="run_review"):
+if st.button("Run AI review", type="primary", disabled=not configured_key, key="run_review"):
     with st.status("Starting review", expanded=True) as status:
         last_message = st.empty()
         with st.spinner("Waiting for the model and checking evidence…", show_time=True):

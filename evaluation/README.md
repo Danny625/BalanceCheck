@@ -2,6 +2,8 @@
 
 No real Gemini evaluation has been performed by the initial build. Automated tests use a clearly identified test double to verify plumbing, not model quality.
 
+The interactive app lets users try every supplied scenario without evaluation setup. That convenience does not turn exploratory runs into a formal score. Before a formal evaluation, agree on expected outcomes and criteria, then use this runner to preserve the original results. Scenarios repeatedly used to tune behavior become development examples; replace them with fresh held-out cases if claiming held-out performance.
+
 `answer_key.json` is an AI-assisted **draft** derived from the proposal and supplied inputs. Two teammates must review acceptable outputs, required evidence, limitations, and next steps; resolve ambiguity; set `status` to `frozen`; and commit it before evaluation. Do not tune on held-out model outputs.
 
 There are ten logical cases. The supplied package contains twelve held-out scenario folders because cases 4 and 7 have two versions. An additional derived `06_control` fixture removes only repeated copies from case 6 so duplicate-volume invariance can be checked. The complete planned evaluation therefore has **thirteen executions for ten logical cases**. Cases 4, 6, and 7 require both versions to pass. Record any additional repeat runs separately.

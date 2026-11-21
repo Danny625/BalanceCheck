@@ -1,5 +1,5 @@
 from streamlit.testing.v1 import AppTest
-from data import ROOT
+from data import ROOT, scenarios
 import pytest
 
 
@@ -23,7 +23,6 @@ def test_app_loads_without_credentials_and_baseline_is_available(monkeypatch):
     app.selectbox(key="scenario").set_value("01_strong_performance").run()
     assert not app.exception
     assert app.button(key="run_review").disabled
-    assert any("held-out" in item.value for item in app.warning)
     app.radio[0].set_value("Upload CSVs").run()
     assert not app.exception
     assert any("Upload both" in item.value for item in app.info)
@@ -82,3 +81,8 @@ def test_hosted_secrets_enable_reviews_without_user_setup(monkeypatch):
     assert not app.text_input
     assert not app.button(key="run_review").disabled
     assert not any("Model for this app" == box.label for box in app.selectbox)
+    for scenario in scenarios():
+        app.selectbox(key="scenario").set_value(scenario).run()
+        assert not app.exception
+        assert not app.button(key="run_review").disabled
+        assert not any("freeze" in item.value.lower() or "held-out" in item.value.lower() for item in app.warning)

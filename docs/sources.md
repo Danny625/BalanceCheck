@@ -24,3 +24,5 @@ Accessed November 20, 2026:
 - [Streamlit documentation](https://docs.streamlit.io/).
 
 The final three references came from the proposal and were not independently re-reviewed in full during implementation.
+
+Additional verification: [Flash-Lite pricing](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite), [Streamlit hosted secrets](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management), and [GitHub personal repo permissions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/repository-access-and-collaboration/permission-levels-for-a-personal-account-repository), accessed November 20, 2026. Controlled API observations are in model_probe_results.json; they do not establish the cause of provider server errors.

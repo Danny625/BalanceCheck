@@ -7,7 +7,7 @@ Team: Scott Shu, Elizabeth Hsu, Danny Weng.
 
 ## Current status
 
-The local app, Python metrics/evidence tools, Gemini agent loop, downloads, and evaluation runner are implemented. Live Gemini verification is in progress; no measured model hit rate is claimed. The answer key is a draft for team review. This is not yet the complete midpoint submission.
+The local app, Python metrics/evidence tools, Gemini agent loop, downloads, and evaluation runner are implemented. A live Flash-Lite practice run completed and passed report validation; no held-out model hit rate is claimed. The answer key is a draft for team review. This is not yet the complete midpoint submission.
 
 ## Start here
 
@@ -21,6 +21,9 @@ The local app, Python metrics/evidence tools, Gemini agent loop, downloads, and 
 - [Known weaknesses](docs/known_weaknesses.md)
 - [Evaluation and scoring instructions](evaluation/README.md)
 - [Sources](docs/sources.md)
+- [Verified model choice](docs/model_choice.md)
+- [Shared app deployment](docs/deployment.md)
+- [Actual practice report](examples/practice/report.md)
 
 ## Planned experience
 
@@ -76,7 +79,7 @@ Windows/cloud setup have not yet been independently verified.
 
 The launcher's one-time setup saves the checked key and chosen model into owner-readable `.env.local`, excluded from Git. You can also copy `.env.example` to `.env.local` and configure it manually. Never paste a key in chat. Local setup is enabled only by `BALANCECHECK_LOCAL_SETUP=1`; it is not shown in normal/cloud launches. With model access configured, no key field or model selector is shown to reviewers. To change a saved key/model, edit `.env.local` locally or replace the hosted secret; a hosted change may require restarting the app. Saved local values are read on each rerun.
 
-The configurable default model is `gemini-4-hydrogen`, listed with a free API tier when checked November 20, 2026. Quotas and model availability depend on your project. The app does not enable billing, but cannot guarantee zero cost on a project with paid billing already enabled. The owner chooses the model during setup or configures `GEMINI_MODEL`; regular users do not choose models.
+The configurable default model is `gemini-3.5-flash-lite`, listed with a free API tier when checked November 20, 2026. Quotas and model availability depend on your project. The app does not enable billing, but cannot guarantee zero cost on a project with paid billing already enabled. The owner chooses the model during setup or configures `GEMINI_MODEL`; regular users do not choose models.
 
 ## Application files
 
@@ -133,3 +136,5 @@ For a browser link without per-user keys, deploy this same repository to Streaml
 | Upload rejected | Check column names, counts, roster, skill groups, and size. |
 
 GitHub stores the project; it does not run the app. The MVP will run locally from this repository. A hosted URL is optional because the assignment permits a repository with accessible instructions and credentials/sandbox where needed.
+
+See the [deployment walkthrough](docs/deployment.md) for one-time hosted setup. Visitors do not enter keys or select models; their requests share the configured project quota.

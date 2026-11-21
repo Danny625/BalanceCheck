@@ -19,7 +19,7 @@ from data import CURRENT, ROOT, DataError, Evidence, records, statistics_baselin
 
 load_dotenv(ROOT / ".env.local")
 load_dotenv(ROOT / ".env")
-DEFAULT_MODEL = "gemini-4-hydrogen"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
 
 
 class ReviewLimitError(RuntimeError):
@@ -139,13 +139,14 @@ def validate_report(report: Report, evidence: Evidence, calls: list[dict]) -> li
         if any(not r or r["character"] != who for r in refs):
             errors.append(f"Invalid metric reference for {who}.")
         groups = set(priority.affected_skill_groups)
-        if groups != {r["skill_group"] for r in current}:
-            errors.append(f"Current metric references must cover exactly the affected groups for {who}.")
-        if priority.action == "Investigate" and any(not r["sample_sufficient"] or r["balance_flag"] not in ["Strong", "Weak"] for r in current):
+        affected = [r for r in current if r["skill_group"] in groups]
+        if not groups <= {r["skill_group"] for r in current}:
+            errors.append(f"Current metric references must cover every affected group for {who}.")
+        if priority.action == "Investigate" and any(not r["sample_sufficient"] or r["balance_flag"] not in ["Strong", "Weak"] for r in affected):
             errors.append(f"Investigation has insufficient or ordinary performance evidence for {who}.")
-        if priority.action == "Collect data" and any(r["sample_sufficient"] and r["pick_rate"] is not None for r in current):
+        if priority.action == "Collect data" and any(r["sample_sufficient"] and r["pick_rate"] is not None for r in affected):
             errors.append(f"Collect data must identify groups with missing counts or insufficient sample for {who}.")
-        if priority.action == "Monitor" and any(not r["sample_sufficient"] for r in current):
+        if priority.action == "Monitor" and any(not r["sample_sufficient"] for r in affected):
             errors.append(f"Low/missing samples require Collect data for {who}.")
         duplicate_roots = set()
         for cid in priority.comment_ids:
@@ -203,6 +204,8 @@ def _api_error(exc: Exception) -> str:
         return "Gemini rejected access. Check the replacement key and project permissions in AI Studio."
     if str(code) == "429":
         return "Gemini quota/rate limit reached. Check free-tier availability in AI Studio and try later. No baseline was substituted."
+    if str(code) in ["500", "502", "503", "504"]:
+        return "Google's model service returned a server error or gateway timeout. This is not a confirmed key/billing error. Try again later or ask the app owner to test another available model."
     if str(code) == "404":
         return "This model is unavailable for the project. Choose an accessible model in AI Studio and update the model field."
     if str(code) == "400":
@@ -215,7 +218,7 @@ def check_connection(api_key: str, model: str = DEFAULT_MODEL) -> dict:
     from google import genai
     client = None
     try:
-        client = genai.Client(api_key=api_key, http_options={"timeout": 20000})
+        client = genai.Client(api_key=api_key, http_options={"timeout": 20000, "retry_options": {"attempts": 1}})
         available = [m.name.removeprefix("models/") for m in client.models.list() if m.name]
         return {"ok": True, "selected_model": model, "selected_model_listed": model in available,
                 "available_models": available}
@@ -246,18 +249,22 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
            "instructions_sha256": sha256(instructions.encode()).hexdigest(), "input_hashes": evidence.hashes,
            "status": "running", "tool_calls": [], "raw_outputs": [], "report": None,
            "validation_errors": [], "baseline": statistics_baseline(evidence)}
-    history = [{"type": "user_input", "content": [{"type": "text", "text": "Review the supplied scenario for the current update. Retrieve rules and all performance first, then relevant context and feedback. When evidence is sufficient, say READY; the next turn will request your structured report."}]}]
+    current_characters = sorted(set(evidence.stats.loc[evidence.stats["update"] == CURRENT, "character"]))
+    required_calls = [("get_review_rules", {}), ("get_performance", {})]
+    required_calls += [(name, {"character": character}) for character in current_characters
+                       for name in ["get_character_context", "get_feedback"]]
+    history = [{"type": "user_input", "content": [{"type": "text", "text": "Review the supplied scenario for the current update. Retrieve rules and all performance first, then context and feedback for every character with current records. After completing those lookups, say READY; the next turn requests the structured report."}]}]
     owned_client = client is None
     try:
         if owned_client:
             from google import genai
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=api_key, http_options={"timeout": 60000, "retry_options": {"attempts": 1}})
         ready = False
         for turn in range(max_rounds):
             if progress:
                 progress(f"Gathering evidence · round {turn + 1}")
             response = client.interactions.create(model=model, input=history, system_instruction=instructions,
-                                                 tools=tool_declarations(), store=False, timeout=120,
+                                                 tools=tool_declarations(), store=False, timeout=60,
                                                  generation_config={"max_output_tokens": 4096})
             dumped = plain(response)
             steps = dumped.get("steps", [])
@@ -267,11 +274,12 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
                 run["raw_outputs"].append({"phase": "gather", "text": text})
             function_calls = [s for s in steps if s.get("type") == "function_call"]
             if not function_calls:
-                have = {c["name"] for c in run["tool_calls"] if "error" not in c["result"]}
-                if {"get_review_rules", "get_performance"} <= have and any(c["name"] == "get_performance" and not c["arguments"] for c in run["tool_calls"]):
+                missing = [{"name": name, "arguments": args} for name, args in required_calls
+                           if not any(c["name"] == name and c["arguments"] == args and "error" not in c["result"] for c in run["tool_calls"])]
+                if not missing:
                     ready = True
                     break
-                history.append({"type": "user_input", "content": [{"type": "text", "text": "Retrieve get_review_rules and unfiltered get_performance before finishing."}]})
+                history.append({"type": "user_input", "content": [{"type": "text", "text": "Required evidence is still missing. Request these tools before finishing: " + json.dumps(missing)}]})
                 continue
             for call in function_calls:
                 if len(run["tool_calls"]) >= max_calls:
@@ -292,7 +300,7 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
             progress("Writing the evidence-backed report")
         history.append({"type": "user_input", "content": [{"type": "text", "text": "Return the final report in the supplied JSON schema, using only retrieved evidence. Do not add numerical rate/count claims in prose; exact values will be displayed from metric_refs."}]})
         final = client.interactions.create(model=model, input=history, system_instruction=instructions,
-                                           store=False, timeout=120, generation_config={"max_output_tokens": 8192},
+                                           store=False, timeout=60, generation_config={"max_output_tokens": 8192},
                                            response_format={"type": "text", "mime_type": "application/json", "schema": Report.model_json_schema()})
         raw = getattr(final, "output_text", "") or ""
         run["raw_outputs"].append({"phase": "final", "text": raw})

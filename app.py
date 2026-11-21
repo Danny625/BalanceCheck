@@ -127,7 +127,8 @@ if held_out_locked:
 if st.button("Run AI review", type="primary", disabled=not configured_key or held_out_locked, key="run_review"):
     with st.status("Starting review", expanded=True) as status:
         last_message = st.empty()
-        run = review(evidence, api_key, model, progress=last_message.write)
+        with st.spinner("Waiting for the model and checking evidence…", show_time=True):
+            run = review(evidence, api_key, model, progress=last_message.write)
         try:
             path = save_run(run)
             run["local_record"] = str(path)

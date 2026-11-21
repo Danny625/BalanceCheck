@@ -1,6 +1,6 @@
 # Simplest architecture
 
-Status: implemented locally with Gemini; live-model verification and formal evaluation remain pending. Based on the supplied project material.
+Status: implemented locally with Gemini; a live practice run is verified; formal evaluation remains pending. Based on the supplied project material.
 
 ## One application
 
@@ -76,11 +76,11 @@ Bind these functions to the selected scenario in application code. Do not expose
 
 1. `app.py` loads and validates the selected inputs through `data.py`.
 2. `app.py` calls the single review entry point in `agent.py` with the loaded evidence.
-3. The model receives the task and tool definitions. Require review rules and performance evidence before a final report; request relevant context/feedback when useful.
+3. The model receives the task and tool definitions. Require rules, unfiltered performance, and context/feedback for every character with current records before a final report.
 4. The model requests a tool. Python validates its arguments, executes the allowlisted function, and returns its result.
 5. Repeat within a fixed call limit. Stop with an honest error on API failure or an exhausted limit; never substitute a fabricated AI report.
 6. Request zero to three priorities in a structured report. Each has character, rank, affected groups, one action (Investigate / Monitor / Collect data), metric references, comment IDs where relevant, uncertainty, and next step.
-7. Check schema, references, numeric claims where machine-verifiable, current-group sample eligibility for Investigate, and priority count. Display a validation failure instead of silently accepting an invalid report. Semantic judgment still requires human evaluation.
+7. Check schema, references, numeric claims where machine-verifiable, affected-group sample eligibility for Investigate (healthy groups may be cited for comparison), and priority count. Display a validation failure instead of silently accepting an invalid report. Semantic judgment still requires human evaluation.
 8. Display the report and an expandable tool log. Save the original output, validation results, model identifier, instructions version/hash, input hashes, timestamp, and tool calls. Do not save credentials.
 
 Comments are untrusted evidence. Ignore embedded instructions. Outdated comments may supply historical context but cannot support current-patch claims. Duplicate copies count once; outdated feedback is excluded from current evidence rather than counted as a fresh complaint.

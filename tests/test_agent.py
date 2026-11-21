@@ -41,7 +41,9 @@ class FakeClient:
         if "response_format" in kwargs:
             return Response(output_text=json.dumps(self.report))
         if len(self.requests) == 1:
-            calls = [("get_review_rules", {}), ("get_performance", {}), ("get_character_context", {"character": "Vex"}), ("get_feedback", {"character": "Vex"})]
+            calls = [("get_review_rules", {}), ("get_performance", {})]
+            calls += [(name, {"character": character}) for character in ["Vex", "Brannoc", "Lyra", "Okoro", "Sable", "Quill"]
+                      for name in ["get_character_context", "get_feedback"]]
             return Response([{"type": "function_call", "id": f"call-{i}", "name": name, "arguments": args} for i, (name, args) in enumerate(calls)])
         return Response(output_text="READY")
 
@@ -51,10 +53,10 @@ def test_complete_tool_loop_preserves_evidence_and_validates(tmp_path):
     e = load_scenario("00_practice")
     run = review(e, "fake-test-key", client=client)
     assert run["status"] == "valid", run
-    assert len(run["tool_calls"]) == 4
+    assert len(run["tool_calls"]) == 14
     second = client.requests[1]
     results = [s for s in second["input"] if s["type"] == "function_result"]
-    assert len(results) == 4
+    assert len(results) == 14
     assert json.loads(results[1]["result"][0]["text"])["rows"]
     assert "00_practice" not in json.dumps(client.requests)
     assert "answer_key" not in json.dumps(client.requests)
@@ -104,3 +106,36 @@ def test_unknown_tools_and_arbitrary_paths_rejected():
     e = load_scenario()
     with pytest.raises(DataError): dispatch(e, "read_file", {"path": "/etc/passwd"})
     with pytest.raises(DataError): dispatch(e, "get_performance", {"path": "evaluation/answer_key.json"})
+
+
+def test_early_ready_requires_missing_context_before_final_report():
+    class EarlyReadyClient(FakeClient):
+        def create(self, **kwargs):
+            if len(self.requests) == 2:
+                self.requests.append(copy.deepcopy(kwargs))
+                calls = [(name, {"character": character}) for character in ["Vex", "Brannoc", "Lyra", "Okoro", "Sable", "Quill"]
+                         for name in ["get_character_context", "get_feedback"]]
+                return Response([{"type": "function_call", "id": f"extra-{i}", "name": name, "arguments": args} for i, (name, args) in enumerate(calls)])
+            response = super().create(**kwargs)
+            if len(self.requests) == 1:
+                response.steps = response.steps[:2]
+            return response
+
+    client = EarlyReadyClient()
+    run = review(load_scenario(), "test-only-placeholder", client=client)
+    assert run["status"] == "valid"
+    assert len(run["tool_calls"]) == 14
+    assert "Required evidence is still missing" in json.dumps(client.requests[2])
+
+
+def test_healthy_group_comparisons_do_not_invalidate_high_only_investigation():
+    e = load_scenario()
+    body = example_report()
+    body["priorities"][0].update(character="Brannoc", affected_skill_groups=["High"],
+                                  metric_refs=[f"stats:3.2:Brannoc:{g}" for g in ["Low", "Mid", "High"]],
+                                  comment_ids=["C013"], context_refs=["P32-03"])
+    calls = [{"name": name, "arguments": args, "result": dispatch(e, name, args)} for name, args in [
+        ("get_review_rules", {}), ("get_performance", {}), ("get_character_context", {"character": "Brannoc"}), ("get_feedback", {"character": "Brannoc"})]]
+    assert not validate_report(Report.model_validate(body), e, calls)
+    body["priorities"][0]["affected_skill_groups"] = ["Low", "High"]
+    assert any("ordinary" in message for message in validate_report(Report.model_validate(body), e, calls))

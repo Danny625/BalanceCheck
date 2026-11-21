@@ -17,7 +17,7 @@ Automated checks cover all supplied scenario loading, arithmetic/missing-count b
 
 ## Still to verify
 
-- Successful live Gemini practice run using a replacement private key and available project quota/model.
+- Real-model consistency across the frozen held-out evaluation; the practice run alone is insufficient.
 - Team-reviewed frozen answer keys, actual held-out outputs, hit rate, and verbatim failures.
 - Fresh reviewer setup, sandbox credentials, Windows launch, cloud deployment, and real-model latency/quota behavior.
 - Whether feedback/mechanics add better investigation steps or limitations than the statistics-only baseline.
@@ -26,4 +26,8 @@ No measured accuracy or effect on a live game's balance is claimed. Record obser
 
 ## Initial live setup attempt
 
-The first practice attempts failed before any evidence tool ran. The original generic error message was insufficient to identify the cause. Safe diagnostics were added; one fresh attempt returned Google HTTP 400 / API key invalid, and a subsequent attempt timed out before evidence retrieval. A separate metadata-only connection check and a longer review timeout were added. A successful live practice run remains outstanding. These setup failures are not scored model recommendations. No key value is recorded here.
+The first practice attempts failed before any evidence tool ran. The original generic error message was insufficient to identify the cause. Safe diagnostics were added; one fresh attempt returned Google HTTP 400 / API key invalid, and a subsequent attempt timed out before evidence retrieval. A separate metadata-only connection check and a longer review timeout were added. A subsequent Flash-Lite practice run succeeded, as documented below. These setup failures are not scored model recommendations. No key value is recorded here.
+
+## Successful practice run and observed repairs
+
+A controlled same-settings comparison found Flash-Lite responsive while Hydrogen and Flash returned HTTP 504. The full Flash-Lite practice run retrieved fourteen tools and passed validation. An earlier failed practice output skipped required context/comment retrieval and invented a patch reference; the controller now enforces those lookups. A later output correctly cited normal skill groups as comparisons but was rejected by an overly strict validator; eligibility checks now apply to affected groups, with regression coverage. Original model output is not silently repaired. See model_choice.md and examples/practice/ for evidence.

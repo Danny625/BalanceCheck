@@ -1,5 +1,15 @@
 from streamlit.testing.v1 import AppTest
 from data import ROOT
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def isolate_private_local_setup(monkeypatch):
+    # UI tests must not read an owner's actual saved key/model.
+    import dotenv
+    monkeypatch.setattr(dotenv, "dotenv_values", lambda *args, **kwargs: {})
+    for name in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL"]:
+        monkeypatch.delenv(name, raising=False)
 
 
 def test_app_loads_without_credentials_and_baseline_is_available(monkeypatch):
@@ -40,7 +50,7 @@ def test_local_setup_checks_saves_then_hides_owner_controls(monkeypatch, tmp_pat
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     monkeypatch.setattr(agent, "check_connection", lambda key, model: {
-        "ok": True, "available_models": ["gemini-4-hydrogen"], "selected_model_listed": True})
+        "ok": True, "available_models": [agent.DEFAULT_MODEL], "selected_model_listed": True})
     (tmp_path / ".gitignore").write_text(".env.*\n")
     save = agent.save_local_configuration
 
@@ -60,3 +70,15 @@ def test_local_setup_checks_saves_then_hides_owner_controls(monkeypatch, tmp_pat
     assert not app.text_input
     assert not app.button(key="run_review").disabled
     assert (tmp_path / ".env.local").exists()
+
+
+def test_hosted_secrets_enable_reviews_without_user_setup(monkeypatch):
+    monkeypatch.delenv("BALANCECHECK_LOCAL_SETUP", raising=False)
+    app = AppTest.from_file(ROOT / "app.py", default_timeout=30)
+    app.secrets["GEMINI_API_KEY"] = "cloud-test-placeholder"
+    app.secrets["GEMINI_MODEL"] = "gemini-3.5-flash-lite"
+    app.run()
+    assert not app.exception
+    assert not app.text_input
+    assert not app.button(key="run_review").disabled
+    assert not any("Model for this app" == box.label for box in app.selectbox)

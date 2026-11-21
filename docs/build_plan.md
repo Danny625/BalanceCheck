@@ -1,6 +1,6 @@
 # Build plan and midpoint completion criteria
 
-Status: local implementation exists; no live-model pass rate is claimed. Team review, live practice verification, and formal evaluation remain outstanding.
+Status: local implementation exists; no live-model pass rate is claimed. Live practice verification is complete; team review and formal evaluation remain outstanding.
 
 ## Stage 1 — Agree on rules and data
 
@@ -9,7 +9,7 @@ Status: local implementation exists; no live-model pass rate is claimed. Team re
 - [ ] Team reviews guide, thresholds, ranking rules, and metric denominators.
 - [ ] Clarify the spec's wording about outdated feedback: the guide excludes it from current-patch evidence. Preserve historical context separately.
 - [ ] Clarify acceptable ranking/actions when strong evidence competes with Collect data priorities; record in the guide and answer keys before evaluation.
-- [ ] Confirm a model/provider and API access before API implementation.
+- [x] Confirm a model/provider and API access before API implementation.
 
 ## Stage 2 — Build one complete practice run
 
@@ -17,7 +17,7 @@ Status: local implementation exists; no live-model pass rate is claimed. Team re
 - [x] Verify rates, group/overall handling, sample eligibility, patch filtering, and duplicate normalization with focused tests.
 - [x] Implement four read-only evidence tools.
 - [x] Implement `agent.py` and instructions with a bounded tool loop and structured report validation.
-- [ ] Demonstrate a complete run on `00_practice`; save its actual evidence/tool trace.
+- [x] Demonstrate a complete run on `00_practice`; save its actual evidence/tool trace.
 
 Do not tune on held-out scenarios. Use additional clearly labeled practice fixtures if needed.
 

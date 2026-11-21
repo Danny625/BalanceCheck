@@ -43,8 +43,9 @@ You need Python 3.12 or newer (tested with 3.14), internet access, and a Gemini 
 1. Download this repository using **Code → Download ZIP**, then unzip it. GitHub Desktop is another option.
 2. On a Mac with Python installed, double-click `Launch.command`. The first launch installs dependencies into the project environment. If macOS blocks it, use the terminal steps below.
 3. Open the localhost link shown in the terminal, usually `http://localhost:8501`.
-4. Enter your Gemini API key in the sidebar password field, select `00_practice`, and click **Run AI review**.
-5. Read the priorities, expand the tool/evidence log, and download the report or complete JSON run record. Keep the terminal running; Control+C stops the app.
+4. In the one-time setup panel, enter your Gemini key and click **Check Gemini connection**. Choose an available text model whose free tier you verified in AI Studio, then click **Save setup on this computer**. The setup controls disappear after saving.
+5. Select `00_practice` and click **Run AI review**. The key/model are loaded automatically on future launches.
+6. Read the priorities, expand the tool/evidence log, and download the report or complete JSON run record. Keep the terminal running; Control+C stops the app.
 
 Install Python from [python.org](https://www.python.org/downloads/) if necessary. Obtain a Gemini key from [Google AI Studio](https://aistudio.google.com/apikey). A ChatGPT/OpenAI key is not a Gemini credential.
 
@@ -56,6 +57,7 @@ Open a terminal in the downloaded repository folder:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+export BALANCECHECK_LOCAL_SETUP=1
 python -m streamlit run app.py
 ```
 
@@ -64,6 +66,7 @@ python -m streamlit run app.py
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
+$env:BALANCECHECK_LOCAL_SETUP="1"
 .\.venv\Scripts\python -m streamlit run app.py
 ```
 
@@ -71,9 +74,9 @@ Windows/cloud setup have not yet been independently verified.
 
 ### Save the key once (optional)
 
-Copy `.env.example` to `.env.local` and fill in `GEMINI_API_KEY` locally. That file is ignored by Git. Environment variables and Streamlit app secrets are also supported. With a server key configured, users do not need to enter their own key. The password field is session-only; keys are excluded from reports and run logs.
+The launcher's one-time setup saves the checked key and chosen model into owner-readable `.env.local`, excluded from Git. You can also copy `.env.example` to `.env.local` and configure it manually. Never paste a key in chat. Local setup is enabled only by `BALANCECHECK_LOCAL_SETUP=1`; it is not shown in normal/cloud launches. With model access configured, no key field or model selector is shown to reviewers. To change a saved key/model, edit `.env.local` locally or replace the hosted secret; a hosted change may require restarting the app. Saved local values are read on each rerun.
 
-The configurable default model is `gemini-4-hydrogen`, listed with a free API tier when checked November 20, 2026. Quotas and model availability depend on your project. The app does not enable billing, but cannot guarantee zero cost on a project with paid billing already enabled. Change the model in sidebar settings or `GEMINI_MODEL` if needed.
+The configurable default model is `gemini-4-hydrogen`, listed with a free API tier when checked November 20, 2026. Quotas and model availability depend on your project. The app does not enable billing, but cannot guarantee zero cost on a project with paid billing already enabled. The owner chooses the model during setup or configures `GEMINI_MODEL`; regular users do not choose models.
 
 ## Application files
 

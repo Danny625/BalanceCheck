@@ -8,10 +8,11 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 from typing import Literal
 from uuid import uuid4
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from pydantic import BaseModel, ConfigDict, Field
 
 from data import CURRENT, ROOT, DataError, Evidence, records, statistics_baseline
@@ -23,6 +24,40 @@ DEFAULT_MODEL = "gemini-4-hydrogen"
 
 class ReviewLimitError(RuntimeError):
     """Only locally generated, safe-to-display loop-limit messages."""
+
+
+def save_local_configuration(api_key: str, model: str, *, root: Path = ROOT) -> None:
+    """Persist only after the owner's explicit Save button; never return the secret."""
+    if not api_key or any(c.isspace() for c in api_key):
+        raise ValueError("Use the complete key without spaces, newlines, or quotes.")
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", model):
+        raise ValueError("Choose a valid model identifier.")
+    target = root / ".env.local"
+    if target.is_symlink():
+        raise ValueError("Refusing to save credentials through a symbolic link.")
+    try:
+        tracked = subprocess.run(["git", "ls-files", "--error-unmatch", ".env.local"], cwd=root,
+                                 capture_output=True, check=False).returncode == 0
+    except OSError:
+        tracked = False
+    if tracked:
+        raise ValueError(".env.local is tracked by Git. Remove it from tracking before saving a credential.")
+    ignore = root / ".gitignore"
+    if not ignore.exists() or not {".env.local", ".env.*"}.intersection(ignore.read_text().splitlines()):
+        raise ValueError("Add .env.local to .gitignore before saving the key.")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=root, prefix=".key-setup-", delete=False) as stream:
+            temporary = Path(stream.name)
+            if target.exists():
+                stream.write(target.read_text())
+        set_key(temporary, "GEMINI_API_KEY", api_key, quote_mode="always")
+        set_key(temporary, "GEMINI_MODEL", model, quote_mode="always")
+        temporary.chmod(0o600)
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 class Priority(BaseModel):

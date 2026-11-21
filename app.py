@@ -1,17 +1,23 @@
 """Run locally with: streamlit run app.py."""
 import json
 import os
+from hashlib import sha256
 
 import pandas as pd
 import streamlit as st
+from dotenv import dotenv_values
 
-from agent import DEFAULT_MODEL, check_connection, report_markdown, review, save_run
+from agent import DEFAULT_MODEL, check_connection, report_markdown, review, save_local_configuration, save_run
 from data import CURRENT, ROOT, DataError, load_scenario, records, scenarios, statistics_baseline
 
 st.set_page_config(page_title="BalanceCheck", page_icon="⚖️", layout="wide")
 
 
 def configured_secret(name):
+    # Read on every rerun so saving local setup takes effect without a restart.
+    local = dotenv_values(ROOT / ".env.local")
+    if local.get(name):
+        return local[name]
     if os.environ.get(name):
         return os.environ[name]
     try:
@@ -35,34 +41,44 @@ st.write("Choose which characters deserve review before the next update.")
 st.caption("Shardfall Arena · Synthetic data · Current update 3.2 · All investigations and game changes require designer approval.")
 
 with st.sidebar:
-    st.header("Model access")
+    st.header("Review inputs")
     configured_key = configured_secret("GEMINI_API_KEY") or configured_secret("GOOGLE_API_KEY")
-    if configured_key:
-        st.success("A Gemini key is configured on this server.")
-    supplied_key = st.text_input("Gemini API key", type="password", key="api_key_input",
-                                 help="Used only for this session. Never included in reports or committed to GitHub. Leave blank when a server key is configured.")
-    api_key = supplied_key.strip() or configured_key
-    st.caption("Create a key at [Google AI Studio](https://aistudio.google.com/apikey). Free-tier quotas depend on your Google project. This app does not enable billing or guarantee zero cost on a billed project.")
-    with st.expander("Model settings"):
-        model = st.text_input("Gemini model", value=os.environ.get("GEMINI_MODEL", DEFAULT_MODEL))
-        st.caption("Use a model your project can access that supports function calling and structured output.")
-    if st.button("Check Gemini connection", disabled=not api_key, key="check_connection"):
-        with st.spinner("Checking available models…"):
-            connection = check_connection(api_key, model)
-        try:
-            (ROOT / "runs").mkdir(exist_ok=True)
-            (ROOT / "runs" / "connection_check.json").write_text(json.dumps(connection, indent=2))
-        except OSError:
-            pass
-        if connection["ok"]:
-            st.success("Google accepted the key and returned model metadata.")
-            if not connection["selected_model_listed"]:
-                st.warning("The selected model is not listed for this key. Choose an available model under Model settings; verify its free-tier pricing in AI Studio.")
-            with st.expander("Available models", expanded=not connection["selected_model_listed"]):
-                st.write(connection["available_models"])
-        else:
-            st.error(connection["error"])
-            st.caption(f"Diagnostic: {connection['exception_type']} · {connection['status_code']}")
+    api_key = configured_key
+    model = configured_secret("GEMINI_MODEL") or DEFAULT_MODEL
+    local_setup = os.environ.get("BALANCECHECK_LOCAL_SETUP") == "1"
+    if not configured_key and local_setup:
+        with st.expander("App setup · once per computer", expanded=True):
+            api_key = st.text_input("Gemini API key", type="password", key="api_key_input",
+                                    help="Enter the full active replacement key. Save below to keep it in an ignored private local file.").strip()
+            st.caption("Create a key at [Google AI Studio](https://aistudio.google.com/apikey). The app does not enable billing. Verify your project's free tier before use.")
+            key_fingerprint = sha256(api_key.encode()).hexdigest()
+            if st.button("Check Gemini connection", disabled=not api_key, key="check_connection"):
+                with st.spinner("Checking key and available models…"):
+                    result = check_connection(api_key, model)
+                st.session_state["connection_check"] = {"key_fingerprint": key_fingerprint, "result": result}
+            checked = st.session_state.get("connection_check", {})
+            connection = checked.get("result", {}) if checked.get("key_fingerprint") == key_fingerprint else {}
+            if connection.get("ok"):
+                st.success("Google accepted the key.")
+                options = connection["available_models"]
+                if options:
+                    chosen_model = st.selectbox("Model for this app", options,
+                                               index=options.index(model) if model in options else None,
+                                               placeholder="Choose a free text model verified in AI Studio", key="setup_model")
+                    model = chosen_model or model
+                    st.caption("Owner setup only. Choose a text model with tools/structured output and confirm its free-tier availability in AI Studio. Reviewers will not see this setting.")
+                    if st.button("Save setup on this computer", key="save_setup", disabled=not chosen_model):
+                        try:
+                            save_local_configuration(api_key, model)
+                        except (ValueError, OSError) as exc:
+                            st.error(str(exc) if isinstance(exc, ValueError) else "Could not write the private local setup file. Check folder permissions.")
+                        else:
+                            st.rerun()
+            elif connection:
+                st.error(connection["error"])
+                st.caption(f"Diagnostic: {connection['exception_type']} · {connection['status_code']}")
+    elif not configured_key:
+        st.info("The app owner needs to configure model access. Reviewers do not need their own key.")
     mode = st.radio("Input source", ["Sample scenario", "Upload CSVs"])
     sample = st.selectbox("Scenario", scenarios(), disabled=mode == "Upload CSVs", key="scenario")
     stats_upload = feedback_upload = None
@@ -100,15 +116,15 @@ c3.metric("Player comments", len(evidence.feedback))
 for warning in evidence.warnings:
     st.warning(warning)
 
-if not api_key:
-    st.info("Data is ready. Enter your Gemini key in the sidebar to enable the AI review. You can inspect inputs and the statistics-only baseline below without a key.")
+if not configured_key:
+    st.info("Data is ready. The app owner must complete model setup to enable AI reviews. You can inspect inputs and the statistics-only baseline below without a key.")
 
 key_status = json.loads((ROOT / "evaluation" / "answer_key.json").read_text())["status"]
 held_out_locked = mode == "Sample scenario" and sample != "00_practice" and key_status != "frozen"
 if held_out_locked:
     st.warning("This is a held-out evaluation scenario. The team must review, freeze, and commit evaluation/answer_key.json before running the AI on it. You can still inspect its inputs and baseline.")
 
-if st.button("Run AI review", type="primary", disabled=not api_key or held_out_locked, key="run_review"):
+if st.button("Run AI review", type="primary", disabled=not configured_key or held_out_locked, key="run_review"):
     with st.status("Starting review", expanded=True) as status:
         last_message = st.empty()
         run = review(evidence, api_key, model, progress=last_message.write)

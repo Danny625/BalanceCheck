@@ -26,8 +26,37 @@ def test_app_model_connection_with_test_double(monkeypatch, tmp_path):
     from tests.test_agent import FakeClient
     monkeypatch.setattr(agent, "review", lambda e, key, model, **kw: original(e, key, model, client=FakeClient(), **kw))
     monkeypatch.setattr(agent, "save_run", lambda run: save(run, tmp_path))
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     app = AppTest.from_file(ROOT / "app.py", default_timeout=30).run()
-    app.text_input(key="api_key_input").set_value("test-only-placeholder").run()
+    assert not app.text_input
     app.button(key="run_review").click().run()
     assert not app.exception
     assert any("Review report" == s.value for s in app.subheader)
+
+
+def test_local_setup_checks_saves_then_hides_owner_controls(monkeypatch, tmp_path):
+    import agent
+    monkeypatch.setenv("BALANCECHECK_LOCAL_SETUP", "1")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setattr(agent, "check_connection", lambda key, model: {
+        "ok": True, "available_models": ["gemini-4-hydrogen"], "selected_model_listed": True})
+    (tmp_path / ".gitignore").write_text(".env.*\n")
+    save = agent.save_local_configuration
+
+    def save_setup(key, model):
+        save(key, model, root=tmp_path)
+        monkeypatch.setenv("GEMINI_API_KEY", key)
+        monkeypatch.setenv("GEMINI_MODEL", model)
+
+    monkeypatch.setattr(agent, "save_local_configuration", save_setup)
+    app = AppTest.from_file(ROOT / "app.py", default_timeout=30).run()
+    app.text_input(key="api_key_input").set_value("test-only-placeholder").run()
+    assert app.button(key="run_review").disabled
+    app.button(key="check_connection").click().run()
+    assert not app.exception
+    app.button(key="save_setup").click().run()
+    assert not app.exception
+    assert not app.text_input
+    assert not app.button(key="run_review").disabled
+    assert (tmp_path / ".env.local").exists()

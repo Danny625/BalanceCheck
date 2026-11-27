@@ -35,3 +35,9 @@ The composition takes cues from [Figma's UI3 workspace](https://www.figma.com/bl
 54 automated checks pass, including API failure/invalid-output retry recovery, invalid-rule reset recovery, source disclosure, source preservation after input changes, settings isolation, all scenario loading, input validation, calculation and reference checks, and mock HTTP protocol behavior. See [actual final practice report](../examples/final_checks/polish_report.md) and [original run record](../examples/final_checks/polish_run.json).
 
 The existing native labels, focus controls, tabs, and headings are preserved. Small-label opacity was corrected after inspecting actual computed styles. Dense evidence tables still use horizontal scrolling on narrow screens. This was a desktop browser flow check, not a full screen-reader/mobile/accessibility certification. No measured held-out accuracy or time savings is claimed. Gemini availability and project quota remain external dependencies. Designer approvals remain outside the app.
+
+## Hosted verification
+
+The [shared Streamlit app](https://nepequsuieu8cbvkfunzsw.streamlit.app) showed the new Review/Evidence interface after commit `615a641` was pushed. A fresh hosted practice review completed, passed validation, and returned Vex, Lyra, Brannoc in that order. Visitor key/model setup was absent. The hosted session restarted as deployment finished; important reports should be downloaded before a redeploy. The retained JSON/Markdown evidence above comes from the local live run, where both download controls were verified.
+
+![Published workspace](screenshots/polish/06-hosted.jpg)

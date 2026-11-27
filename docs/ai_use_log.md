@@ -33,3 +33,9 @@ At the user's request, Codex implemented configurable review rules, roster/skill
 ## Usability and visual polish — November 27, 2026
 
 Codex audited the local first-visit/review experience using browser screenshots, looked at Figma's official UI3 design reference at the user's request, and refined the app into a Review/Evidence workspace with a charcoal/coral game-tool treatment. Codex added readable scenario labels, source text disclosures next to priorities, easier report downloads, accurate native upload-size controls, clearer progress messages, and a short contributor guide. Regression checks cover source text, preservation of original sources after input changes, API/invalid-output retry recovery, and invalid-rule reset recovery. Code and docs were checked; browser screenshots and final verification scope are recorded in usability_review.md. No claim of a held-out evaluation or full accessibility certification is made.
+
+## Further visual refinement — November 27, 2026
+
+At the user's request, Codex softened the workspace panels, coordinated control shapes and spacing, refined numeric typography, and replaced default underline tabs with compact segmented navigation. Styling targets the actual Streamlit/React Aria controls and preserves selected states, focus indication, and reduced-motion preferences. Analysis rules and model behavior were unchanged. Visual design remains subject to further user feedback.
+
+A further user suggestion added shallow elevation through layered shadows, highlighted edges, and pressed button states. The final depth treatment was inspected in a fresh browser session. This remains presentation-only work.

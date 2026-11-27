@@ -16,4 +16,4 @@ Do not commit API credentials or private player data. Keep evaluation keys and t
 
 ## Current repository status
 
-The repository includes the local app, Gemini connection, software tests, and evaluation tools. A live practice run is verified; formal evaluation remains outstanding. Consult the checklist before reporting midpoint readiness.
+The repository includes the working app, Gemini connection, software tests, and evaluation tools. Live practice runs with default/custom rules are verified; formal evaluation remains separate. Use [CONTRIBUTING.md](../CONTRIBUTING.md) for the current development workflow and [final_updates.md](final_updates.md) for product behavior and verification.

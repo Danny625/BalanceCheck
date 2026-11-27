@@ -1,0 +1,70 @@
+/* Presentation only. Native Streamlit controls retain keyboard/focus behavior. */
+:root {
+    --bc-ink: #25282d;
+    --bc-muted: #60646d;
+    --bc-line: #dcdde2;
+    --bc-accent: #b84635;
+}
+
+.block-container {
+    max-width: 1240px;
+    padding: 2rem 2rem 4rem;
+}
+
+.product-kicker {
+    color: #f1b5a8;
+    font: 600 .69rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+    letter-spacing: .075em;
+}
+
+.product-kicker span {color: #c6c8ce; font-weight: 400;}
+[class*="st-key-brand_header"] {
+    background: #25282d;
+    border-left: 4px solid var(--bc-accent);
+    border-radius: 6px;
+    padding: 1.1rem 1.35rem 1rem;
+    margin-bottom: .75rem;
+    color: #f6f6ff;
+}
+[class*="st-key-brand_header"] h1 {color: #fff;}
+[class*="st-key-brand_header"] [data-testid="stCaptionContainer"] p {color: #c6c8ce; font-size: .76rem; letter-spacing: .025em;}
+h1 {font-size: 2.2rem !important; letter-spacing: -.045em; font-weight: 700 !important; padding-top: .25rem !important;}
+h2, h3 {letter-spacing: -.025em; font-weight: 650 !important;}
+[data-testid="stCaptionContainer"] p {color: var(--bc-muted);}
+[data-testid="stCaptionContainer"] {opacity: 1;}
+
+[data-testid="stSidebar"] {border-right: 1px solid var(--bc-line); background: #fff;}
+[data-testid="stSidebar"] h2 {font-size: 1.1rem;}
+[data-testid="stMetric"] {
+    border-top: 1px solid var(--bc-line);
+    padding: .7rem 0 .5rem;
+}
+[data-testid="stMetricValue"] {
+    font: 500 2rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+    letter-spacing: -.045em;
+    color: var(--bc-ink);
+}
+
+[class*="st-key-priority_"] {
+    background: #fff;
+    border: 1px solid var(--bc-line);
+    border-left: 3px solid var(--bc-accent);
+    border-radius: 6px;
+    padding: 1.2rem;
+    box-shadow: 0 2px 5px #25282d04;
+}
+[class*="st-key-priority_"] h3 {font-size: 1.3rem;}
+[data-testid="stExpander"] {border-color: var(--bc-line); border-radius: 6px; background: #fff;}
+[data-testid="stTable"] {font-size: .88rem;}
+[data-testid="stTable"] th {background: #ebecf0; font-weight: 600;}
+.stButton button, .stDownloadButton button {border-radius: 6px; font-weight: 600;}
+.stButton button[kind="primary"] {padding-inline: 1.2rem;}
+[data-baseweb="tab-list"] {gap: 1.4rem; border-bottom: 1px solid var(--bc-line);}
+[data-baseweb="tab"] {font-weight: 600;}
+
+@media (max-width: 640px) {
+    .block-container {padding-inline: 1rem;}
+    h1 {font-size: 2.2rem !important;}
+    .product-kicker span {display: block;}
+    [class*="st-key-priority_"] {padding: .85rem;}
+}

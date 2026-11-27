@@ -11,8 +11,12 @@ The working Streamlit app includes configurable review rules, complete roster co
 
 ## Start here
 
+- **Reviewers:** open the [shared Streamlit app](https://nepequsuieu8cbvkfunzsw.streamlit.app), choose **Practice review**, and click **Run AI review**. No key/model setup is needed on the configured shared app. Open **Sources for this priority** to check cited comments and patch changes; download the report or full JSON run record above the priorities.
+- **Developers:** follow the local setup below, then use the short [contributor guide](CONTRIBUTING.md) to find the right file and run checks. Offline tests need no API key.
+
+- [Final usability checks and screenshots](docs/usability_review.md)
 - [Simplest architecture and exact file responsibilities](docs/architecture.md)
-- [Build order and midpoint completion checklist](docs/build_plan.md)
+- [Original midpoint build checklist](docs/build_plan.md)
 - [Team collaboration](docs/team_workflow.md)
 - [Supplied one-page specification](docs/BalanceCheck_Spec.pdf)
 - [Synthetic data inventory](data/README.md)
@@ -27,7 +31,7 @@ The working Streamlit app includes configurable review rules, complete roster co
 
 ## Product experience
 
-Choose a sample scenario, click **Run review**, and receive zero to three ranked priorities with an action, affected skill groups, evidence references, uncertainty, and a next step. Upload mode accepts matching statistics and feedback CSVs for the supplied game. Expand **Review rules** to change thresholds, ranking, or roster scope before running. Each report keeps its original settings; changing inputs shows a previous-review warning until you rerun.
+Choose a sample scenario, click **Run AI review**, and receive zero to three ranked priorities with an action, affected skill groups, evidence references, uncertainty, and a next step. Upload mode accepts matching statistics and feedback CSVs for the supplied game. Expand **Review rules** to change thresholds, ranking, or roster scope before running. Each report keeps its original settings; changing inputs shows a previous-review warning until you rerun.
 
 Python calculates the numbers. A hosted language model requests evidence through read-only Python functions and writes the report. A designer approves every investigation and game change.
 
@@ -48,7 +52,7 @@ You need Python 3.12 or newer (tested with 3.14), internet access, and a Gemini 
 3. Open the localhost link shown in the terminal, usually `http://localhost:8501`.
 4. In the one-time setup panel, enter your Gemini key and click **Check Gemini connection**. Choose an available text model whose free tier you verified in AI Studio, then click **Save setup on this computer**. The setup controls disappear after saving.
 5. Select `00_practice` and click **Run AI review**. The key/model are loaded automatically on future launches.
-6. Read the priorities, expand the tool/evidence log, and download the report or complete JSON run record. Keep the terminal running; Control+C stops the app.
+6. Read the priorities, expand Sources for this priority or the evidence retrieval log, and download the report or complete JSON run record. Keep the terminal running; Control+C stops the app.
 
 Install Python from [python.org](https://www.python.org/downloads/) if necessary. Obtain a Gemini key from [Google AI Studio](https://aistudio.google.com/apikey). A ChatGPT/OpenAI key is not a Gemini credential.
 
@@ -89,6 +93,7 @@ The configurable default model is `gemini-3.5-flash-lite`, listed with a free AP
 | `data.py` | CSV validation, Pandas calculations, four read-only evidence tools, statistics baseline. |
 | `agent.py` | Gemini tool loop, structured report checks, reproducible run records. |
 | `instructions.md` | Agent task, boundaries, and evidence-handling rules. |
+| `.streamlit/` | Theme and presentation-only CSS. |
 | `evaluate.py` | Run the same agent for frozen cases and summarize human scoring. |
 
 The model can request rules, performance, character context, and feedback. Python executes only those tools against the selected scenario. No database, separate frontend/backend, agent framework, game-modifying tools, or live player integrations are used.

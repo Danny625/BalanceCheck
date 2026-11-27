@@ -4,8 +4,8 @@
 
 1. Choose a scenario or upload the two supported synthetic CSVs.
 2. Optionally expand **Review rules**. Defaults are 46–54% win rate, 500 appearances per group, 2–30% pick-rate watch, player reach first, and standard plus observed test-queue characters. Reset restores these defaults.
-3. Inspect **How priorities are decided** and **Roster coverage before review**. Missing characters, skill groups, or counts produce warnings. Malformed/impossible data is rejected. Missing values remain unavailable; a report with gaps is explicitly partial.
-4. Run the AI review. Read up to three priority cards, calculated evidence, uncertainty, and next steps. The coverage table explains each character's disposition. Technical logs stay collapsed.
+3. Inspect **Review rules & data coverage**. Missing characters, skill groups, or counts produce warnings. Malformed/impossible data is rejected. Missing values remain unavailable; a report with gaps is explicitly partial.
+4. On **Review**, run the AI review. Read up to three priority cards, calculated evidence, uncertainty, and next steps. The coverage table explains each character's disposition. Cited comments and patch changes open under **Sources for this priority**; technical logs stay collapsed. **Evidence** contains the current input tables, guide, context, and statistics baseline.
 5. Download the report and complete run record. Designer approval happens outside this app. Server-local files are not durable shared storage.
 
 Settings belong to the current browser session, not everyone visiting the hosted app. They are copied into every report and JSON run. Changing inputs/settings preserves the old report with a warning and its original evidence; rerun to apply changes. Visitors continue to use the owner's configured Gemini access without key or model selection.
@@ -20,7 +20,7 @@ The default scope expects every standard character plus test-queue characters ob
 
 ## Verification
 
-- 51 automated checks pass. Coverage includes arithmetic, reference validation, missing complete characters/groups, configurable metrics/order/actions, scope, batched retrieval, rejected outputs, stale-report snapshots, reset behavior, isolated user settings, uploads, and API failures using mock HTTP.
+- 54 automated checks pass. Coverage includes arithmetic, reference validation, missing complete characters/groups, configurable metrics/order/actions, scope, batched retrieval, rejected outputs, stale-report snapshots, reset behavior, isolated user settings, uploads, and API failures using mock HTTP.
 - Live **practice-only** default review passed: Vex, Lyra, Brannoc, all Investigate, in that order. Brannoc is included; Quill does not displace a supported investigation. Two model requests.
 - Live practice review with a wider **40–60%** win-rate range passed: Quill / Collect data; no Investigate priority. Two model requests. This checks that settings change actual behavior.
 - A preceding live report selected Quill while omitting supported investigations. Validation rejected it. The original rejected output is included beside successful runs; it was not silently rewritten.

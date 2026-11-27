@@ -32,15 +32,58 @@ def test_app_model_connection_with_test_double(monkeypatch, tmp_path):
     import agent
     original = agent.review
     save = agent.save_run
-    from tests.test_agent import FakeClient
-    monkeypatch.setattr(agent, "review", lambda e, key, model, **kw: original(e, key, model, client=FakeClient(), **kw))
+    from tests.test_agent import FakeClient, example_report
+    from data import load_scenario
+    body = example_report()
+    body['priorities'][0]['context_refs'] += ['VEX-1', 'B-02']
+    monkeypatch.setattr(agent, "review", lambda e, key, model, **kw: original(e, key, model, client=FakeClient(body), **kw))
     monkeypatch.setattr(agent, "save_run", lambda run: save(run, tmp_path))
     monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     app = AppTest.from_file(ROOT / "app.py", default_timeout=30).run()
+    assert app.selectbox(key='scenario').options[0] == 'Practice review'
     assert not app.text_input
     app.button(key="run_review").click().run()
     assert not app.exception
     assert any("Review priorities" == s.value for s in app.subheader)
+    source = next(r for r in load_scenario().get_feedback('Vex')['comments'] if r['comment_id']=='C012')
+    assert source['text'] in [t.value for t in app.text]
+    assert any('Backlog proposal, not approval' in c.value for c in app.caption)
+    # Changing inputs must keep the old report's cited sources available.
+    app.selectbox(key='scenario').set_value('01_strong_performance').run()
+    assert not app.exception
+    assert source['text'] in [t.value for t in app.text]
+    assert any('previous review' in w.value for w in app.warning)
+
+
+@pytest.mark.parametrize('failure', ['error', 'invalid'])
+def test_failed_review_can_be_retried_without_a_stale_error(monkeypatch, tmp_path, failure):
+    import agent
+    from tests.test_agent import FakeClient, example_report
+    original, save = agent.review, agent.save_run
+    body = example_report()
+    body['priorities'][0]['metric_refs'] = ['unknown-evidence']
+    clients = [FakeClient(fail=True) if failure=='error' else FakeClient(body), FakeClient()]
+    monkeypatch.setattr(agent, 'review', lambda e,key,model,**kw: original(e,key,model,client=clients.pop(0),**kw))
+    monkeypatch.setattr(agent, 'save_run', lambda run: save(run,tmp_path))
+    monkeypatch.setenv('GEMINI_API_KEY','test-only-placeholder')
+    app = AppTest.from_file(ROOT/'app.py',default_timeout=30).run()
+    app.button(key='run_review').click().run()
+    assert not app.exception and app.error
+    assert not any(s.value=='Review priorities' for s in app.subheader)
+    app.button(key='run_review').click().run()
+    assert not app.exception and not app.error
+    assert any(s.value=='Review priorities' for s in app.subheader)
+
+
+def test_invalid_rules_recover_with_reset(monkeypatch):
+    app = AppTest.from_file(ROOT/'app.py',default_timeout=30).run()
+    app.number_input(key='rule_low').set_value(70.0).run()
+    assert not app.exception and app.error
+    assert not any(b.key=='run_review' for b in app.button)
+    app.button(key='reset_rules').click().run()
+    assert not app.exception and not app.error
+    assert app.number_input(key='rule_low').value==46.0
+    assert app.number_input(key='rule_high').value==54.0
 
 
 def test_local_setup_checks_saves_then_hides_owner_controls(monkeypatch, tmp_path):

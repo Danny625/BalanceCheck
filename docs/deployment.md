@@ -1,6 +1,6 @@
 # One shared app without per-user model setup
 
-The local app is working. Cloud deployment is a separate step and has not been performed.
+The team has deployed the same app to Streamlit Community Cloud. The steps below document owner setup and how to verify a deployed revision; a local test alone does not prove the hosted instance is current.
 
 ## Local versus hosted configuration
 

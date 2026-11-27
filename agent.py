@@ -375,7 +375,9 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
                     result = {"error": str(exc)}
                 run["tool_calls"].append({"name": name, "arguments": args, "result": result})
                 if progress:
-                    progress(f"Retrieved {name}" + (f" · {args['character']}" if isinstance(args, dict) and args.get("character") else ""))
+                    label = {"get_review_rules": "Loaded review rules", "get_performance": "Loaded calculated performance",
+                             "get_character_context": "Loaded character context", "get_feedback": "Read player feedback"}.get(name, "Checked evidence")
+                    progress(label + (f" · {args['character']}" if isinstance(args, dict) and args.get("character") else ""))
                 history.append({"type": "function_result", "name": name, "call_id": call["id"],
                                 "result": [{"type": "text", "text": json.dumps(result, allow_nan=False)}]})
             if not _missing_calls(required_calls, run["tool_calls"]):

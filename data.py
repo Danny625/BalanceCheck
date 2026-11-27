@@ -229,7 +229,7 @@ def load_scenario(name: str = "00_practice", *, stats_bytes: bytes | None = None
         stats = pd.concat([stats, pd.DataFrame(missing_rows)], ignore_index=True)
     actual = {**actual, **{k: v for k, v in config.snapshot().items() if k in actual}}
     incomplete = stats.loc[stats["update"].eq(CURRENT) & stats[COUNTS].isna().any(axis=1)]
-    for row in records(incomplete):
+    for row in records(incomplete[~incomplete.record_missing]):
         warnings.append(f"Missing counts: {row['character']}, {row['skill_group']}; affected metrics unavailable.")
     for item in coverage:
         if item["Character"] in set(incomplete.character):

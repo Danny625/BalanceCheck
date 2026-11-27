@@ -39,3 +39,7 @@ Codex audited the local first-visit/review experience using browser screenshots,
 At the user's request, Codex softened the workspace panels, coordinated control shapes and spacing, refined numeric typography, and replaced default underline tabs with compact segmented navigation. Styling targets the actual Streamlit/React Aria controls and preserves selected states, focus indication, and reduced-motion preferences. Analysis rules and model behavior were unchanged. Visual design remains subject to further user feedback.
 
 A further user suggestion added shallow elevation through layered shadows, highlighted edges, and pressed button states. The final depth treatment was inspected in a fresh browser session. This remains presentation-only work.
+
+## Floating workspace refinement — November 27, 2026
+
+Codex revisited Figma's official UI3 reference and revised the presentation to detached desktop control surfaces, a light floating header, coordinated slate/white/charcoal colors, and a restrained coral action accent. Mobile keeps a docked sidebar. Navigation and rendering were browser-checked; model/analysis code was unchanged. Visual design remains open to user feedback.

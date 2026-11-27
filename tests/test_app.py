@@ -40,7 +40,7 @@ def test_app_model_connection_with_test_double(monkeypatch, tmp_path):
     assert not app.text_input
     app.button(key="run_review").click().run()
     assert not app.exception
-    assert any("Review report" == s.value for s in app.subheader)
+    assert any("Review priorities" == s.value for s in app.subheader)
 
 
 def test_local_setup_checks_saves_then_hides_owner_controls(monkeypatch, tmp_path):

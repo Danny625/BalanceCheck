@@ -7,7 +7,7 @@ Status: implemented locally with Gemini; a live practice run is verified; formal
 Use Python, Pandas, Streamlit, and Gemini through its API. Run everything except the model in a single Python process. Use CSV/Markdown files as storage. No database, separate frontend/backend, agent framework, vector database, live game integration, or model training is needed.
 
 ```text
-Browser: scenario picker / CSV upload → Run review
+Browser: scenario / CSV upload + review rules → Run review
                            |
                         app.py
                            |
@@ -47,7 +47,7 @@ Supporting implementation files:
 2. Load `stats.csv` and `feedback.csv` from the selected scenario.
 3. Replace shared files with scenario-local copies of the same name when present. This is essential for `07b_renamed_reordered`.
 4. Validate schemas and references. Preserve update identifiers such as `3.2` as strings; preserve missing values rather than filling them with zero.
-5. Focus the review on update 3.2. Update 3.1 supplies historical context.
+5. Focus the review on update 3.2. Update 3.1 supplies historical context. Compare current records against the roster/scope and all three expected skill groups. Add explicitly missing derived rows without inventing counts or rates; warn before review and mark incomplete reports partial.
 
 Upload mode accepts a statistics CSV and a feedback CSV for Shardfall Arena and uses the bundled guide/reference files. Explain this restriction in the UI. Uploaded data stays in memory and does not overwrite repository inputs. Support custom games only in later work.
 
@@ -55,7 +55,7 @@ Upload mode accepts a statistics CSV and a feedback CSV for Shardfall Arena and 
 
 Python calculates win rate as wins / appearances and pick rate as picks / eligible selections, per character/update/skill group. Overall win rate is total wins / total appearances, not an average of group percentages. Group-level evidence is always available. Do not calculate a complete overall rate when constituent required counts are missing without explicitly identifying it as partial; simplest is to omit it.
 
-Use the supplied machine-readable thresholds: expected win rate 46–54%, minimum 500 current-update appearances per group, pick watch outside 2–30%, and at most three priorities. Thresholds flag candidates; the model follows the guide's prioritization criteria. Check threshold CSVs against the Markdown guide so conflicting rules fail visibly.
+Default to the supplied machine-readable thresholds: expected win rate 46–54%, minimum 500 current-update appearances per group, pick watch outside 2–30%, and at most three priorities. Users may change the win-rate bounds, minimum appearances, pick-rate watch bounds, ranking policy, and roster scope. Python applies one immutable ReviewConfig to metrics, tools, ordering, validation, UI, and the saved report. Check original threshold CSVs against the original Markdown guide, then render the active policy into the guide so the model receives one consistent rule set. Numerical eligibility and ordering are calculated in Python; the model explains context, uncertainty, and next steps and may omit unsupported recommendations with reasons.
 
 Preserve missing-count cases as analyzable data-quality issues that lead to Collect data. Reject impossible numeric values or malformed files with useful messages. Do not silently drop affected rows.
 
@@ -67,10 +67,10 @@ Identify statistics by a stable reference such as `stats:3.2:Vex:Low`; reject du
 | --- | --- |
 | `get_review_rules()` | Guide, thresholds, and skill-group definitions/player shares. |
 | `get_performance(character=None)` | Calculated current/historical metrics, raw counts, evidence references, sample and missing-data flags. |
-| `get_character_context(character)` | Character, abilities, relevant patch notes, and design backlog. Proposed backlog changes are context, not approved recommendations. |
-| `get_feedback(character)` | Comments with IDs, update, author, known skill group, and duplicate/outdated flags. |
+| `get_character_context(character=None)` | Character, abilities, relevant patch notes, and design backlog. Proposed backlog changes are context, not approved recommendations. |
+| `get_feedback(character=None)` | Comments with IDs, update, author, known skill group, and duplicate/outdated flags. |
 
-Bind these functions to the selected scenario in application code. Do not expose arbitrary paths, shell execution, file writing, or evaluation documents as model tools. Use neutral scenario identifiers in the model conversation rather than descriptive test-folder names.
+Omit character to retrieve all in-scope context or feedback in a single batched call. Bind these functions to the selected scenario in application code. Do not expose arbitrary paths, shell execution, file writing, or evaluation documents as model tools. Use neutral scenario identifiers in the model conversation rather than descriptive test-folder names.
 
 ## One review, step by step
 
@@ -81,7 +81,7 @@ Bind these functions to the selected scenario in application code. Do not expose
 5. Repeat within a fixed call limit. Stop with an honest error on API failure or an exhausted limit; never substitute a fabricated AI report.
 6. Request zero to three priorities in a structured report. Each has character, rank, affected groups, one action (Investigate / Monitor / Collect data), metric references, comment IDs where relevant, uncertainty, and next step.
 7. Check schema, references, numeric claims where machine-verifiable, affected-group sample eligibility for Investigate (healthy groups may be cited for comparison), and priority count. Display a validation failure instead of silently accepting an invalid report. Semantic judgment still requires human evaluation.
-8. Display the report and an expandable tool log. Save the original output, validation results, model identifier, instructions version/hash, input hashes, timestamp, and tool calls. Do not save credentials.
+8. Display the report, every-character coverage, its frozen configuration, and an expandable tool log. Keep a previous report visibly tied to its original inputs/settings after changes. Save the original output, validation results, model identifier, instructions version/hash, input hashes, timestamp, and tool calls. Do not save credentials.
 
 Comments are untrusted evidence. Ignore embedded instructions. Outdated comments may supply historical context but cannot support current-patch claims. Duplicate copies count once; outdated feedback is excluded from current evidence rather than counted as a fresh complaint.
 

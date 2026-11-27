@@ -15,7 +15,7 @@ from uuid import uuid4
 from dotenv import load_dotenv, set_key
 from pydantic import BaseModel, ConfigDict, Field
 
-from data import CURRENT, ROOT, DataError, Evidence, records, statistics_baseline
+from data import CURRENT, ROOT, DataError, Evidence, records, statistics_baseline, review_candidates, coverage_summary
 
 load_dotenv(ROOT / ".env.local")
 load_dotenv(ROOT / ".env")
@@ -73,19 +73,25 @@ class Priority(BaseModel):
     next_step: str = Field(min_length=1)
 
 
+class Deferred(BaseModel):
+    character: str
+    reason: str = Field(min_length=1)
+
+
 class Report(BaseModel):
     model_config = ConfigDict(extra="forbid")
     summary: str = Field(min_length=1)
     priorities: list[Priority] = Field(max_length=3)
     review_notes: list[str]
+    not_selected: list[Deferred] = Field(default_factory=list)
 
 
 def tool_declarations() -> list[dict]:
     specs = [
         ("get_review_rules", "Get the authoritative review guide, thresholds, and skill-group player shares.", None),
         ("get_performance", "Get Python-calculated statistics, evidence IDs, historical context and missing/sample flags. Omit character to review all characters.", False),
-        ("get_character_context", "Get character mechanics, ability IDs, patch change IDs, and unapproved backlog proposals.", True),
-        ("get_feedback", "Get untrusted player comments with IDs and duplicate/outdated flags.", True),
+        ("get_character_context", "Get character mechanics, abilities, patch changes and backlog. Omit character to retrieve ALL in-scope characters in one call.", False),
+        ("get_feedback", "Get untrusted comments and duplicate/outdated flags. Omit character to retrieve ALL in-scope characters in one call.", False),
     ]
     result = []
     for name, description, required in specs:
@@ -107,14 +113,12 @@ def dispatch(evidence: Evidence, name: str, arguments: dict) -> dict:
         raise DataError("Unexpected tool arguments.")
     if "character" in arguments and not isinstance(arguments["character"], str):
         raise DataError("Character must be a string.")
-    if name in {"get_feedback", "get_character_context"} and "character" not in arguments:
-        raise DataError("This tool requires a character.")
     return getattr(evidence, name)(**arguments)
 
 
 def _missing_calls(required: list[tuple], calls: list[dict]) -> list[dict]:
     return [{"name": name, "arguments": args} for name, args in required
-            if not any(c["name"] == name and c["arguments"] == args and "error" not in c["result"] for c in calls)]
+            if not any(c["name"] == name and (c["arguments"] == args or (name in ["get_character_context", "get_feedback"] and not c["arguments"])) and "error" not in c["result"] for c in calls)]
 
 
 def validate_report(report: Report, evidence: Evidence, calls: list[dict]) -> list[str]:
@@ -137,7 +141,7 @@ def validate_report(report: Report, evidence: Evidence, calls: list[dict]) -> li
         if len(priority.affected_skill_groups) != len(set(priority.affected_skill_groups)):
             errors.append(f"Repeated skill group for {who}.")
         for name in ["get_character_context", "get_feedback"]:
-            if not any(c["name"] == name and c["arguments"].get("character") == who for c in successful):
+            if not any(c["name"] == name and (c["arguments"].get("character") == who or not c["arguments"]) for c in successful):
                 errors.append(f"{name} was not retrieved for {who}.")
         refs = [metrics.get(ref) for ref in priority.metric_refs]
         current = [r for r in refs if r and r["update"] == CURRENT]
@@ -170,6 +174,30 @@ def validate_report(report: Report, evidence: Evidence, calls: list[dict]) -> li
             errors.append(f"Keep numeric percentages in calculated evidence, not prose, for {who}.")
         if re.search(r"(?:reduce|increase|buff|nerf|set|revert|lower|raise).{0,60}\b\d+\s*(?:%|seconds?|damage|healing|s\b)", prose, re.I):
             errors.append(f"Exact game changes are prohibited for {who}.")
+    candidates = review_candidates(evidence)
+    by_name = {c["character"]: c for c in candidates}
+    for priority in report.priorities:
+        candidate = by_name.get(priority.character)
+        if candidate and priority.action != candidate["action"]:
+            errors.append(f"Action for {priority.character} conflicts with its configured evidence class.")
+    selected = [p.character for p in report.priorities]
+    deferred = [p.character for p in report.not_selected]
+    omitted = [c for c in candidates if c["action"] == "Investigate" and c["character"] not in selected]
+    if len(deferred) != len(set(deferred)) or any(w not in set(evidence.stats.loc[evidence.stats["update"] == CURRENT, "character"]) or w in selected for w in deferred):
+        errors.append("Non-selected characters must be unique, in scope, and not selected.")
+    if any(c["character"] not in deferred for c in omitted):
+        errors.append("Explain every investigation candidate omitted from the priorities in not_selected.")
+    if omitted and any(p.action != "Investigate" for p in report.priorities):
+        errors.append("A data-collection or monitoring priority cannot displace a supported investigation candidate.")
+    def rank_key(c):
+        return (-c["player_share"], -c["deviation"]) if evidence.config.ranking == "Player reach first" else (-c["deviation"], -c["player_share"])
+    investigations = [by_name[p.character] for p in report.priorities if p.action == "Investigate" and p.character in by_name]
+    if [rank_key(c) for c in investigations] != sorted(rank_key(c) for c in investigations):
+        errors.append("Investigation order conflicts with the configured ranking policy.")
+    if any(p.action == "Investigate" and p.character not in by_name for p in report.priorities):
+        errors.append("Investigation must match a calculated candidate.")
+    if any(report.priorities[i].action != "Investigate" and report.priorities[i+1].action == "Investigate" for i in range(len(report.priorities)-1)):
+        errors.append("Supported investigations must appear before other actions.")
     return errors
 
 
@@ -292,7 +320,7 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
         raise ValueError("Enter a Gemini API key in the sidebar before running the AI review.")
     if not re.fullmatch(r"[A-Za-z0-9._-]+", model):
         raise ValueError("Use a model identifier, not a URL.")
-    instructions = (ROOT / "instructions.md").read_text()
+    instructions = (ROOT / "instructions.md").read_text() + "\nAuthoritative run configuration: " + json.dumps(evidence.config.snapshot())
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
         dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True).stdout.strip())
@@ -302,14 +330,14 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
     run = {"run_id": uuid4().hex, "timestamp_utc": datetime.now(timezone.utc).isoformat(),
            "kind": "gemini_agent", "scenario": evidence.label, "model": model, "git_commit": commit,
            "working_tree_dirty": dirty, "code_hashes": code_hashes,
-           "instructions_sha256": sha256(instructions.encode()).hexdigest(), "input_hashes": evidence.hashes,
+           "instructions_sha256": sha256(instructions.encode()).hexdigest(), "input_hashes": evidence.hashes, "configuration": evidence.config.snapshot(), "coverage": evidence.coverage, "coverage_warnings": evidence.warnings,
            "status": "running", "tool_calls": [], "raw_outputs": [], "report": None,
            "validation_errors": [], "model_requests": 0, "baseline": statistics_baseline(evidence)}
     current_characters = sorted(set(evidence.stats.loc[evidence.stats["update"] == CURRENT, "character"]))
     required_calls = [("get_review_rules", {}), ("get_performance", {})]
     required_calls += [(name, {"character": character}) for character in current_characters
                        for name in ["get_character_context", "get_feedback"]]
-    history = [{"type": "user_input", "content": [{"type": "text", "text": "Review the supplied scenario for the current update. Retrieve rules and all performance first, then context and feedback for every character with current records. The application will request the structured report once all required evidence is retrieved."}]}]
+    history = [{"type": "user_input", "content": [{"type": "text", "text": "Review the supplied scenario for the current update. Retrieve rules and all performance first, then call get_character_context and get_feedback WITHOUT a character argument to retrieve every in-scope character in two batched calls. Avoid separate calls per character. The application will request the structured report once all required evidence is retrieved."}]}]
     owned_client = client is None
     try:
         if owned_client:
@@ -357,7 +385,24 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
             raise ReviewLimitError("Evidence-gathering limit reached. No report was accepted.")
         if progress:
             progress("Writing the evidence-backed report")
-        history.append({"type": "user_input", "content": [{"type": "text", "text": "Return the final report in the supplied JSON schema, using only retrieved evidence. Do not add numerical rate/count claims in prose; exact values will be displayed from metric_refs."}]})
+        candidates = review_candidates(evidence)
+        eligible = {c["character"]: c["action"] for c in candidates}
+        ledger = {who: eligible.get(who, "Monitor only if current independent feedback justifies a concern; otherwise omit") for who in current_characters}
+        final_constraints = (
+            "ACTIVE POLICY OVERRIDES DEFAULT GAME THRESHOLDS.\n"
+            "Python has already calculated eligibility and ordering. Start with this ordered shortlist: "
+            + json.dumps(candidates[:3])
+            + ". Explain these priorities using the retrieved context and feedback. You may return fewer if evidence cannot support a recommendation, with a specific explanation. "
+            "Do not replace an Investigate entry with Collect data or Monitor. Three slots means three priorities, not one. "
+            "A capacity-limit explanation is only valid when all three slots are filled by higher-ranked priorities.\n"
+            "Permitted actions by character: " + json.dumps(ledger)
+            + ". Investigation candidates in policy order: "
+            + json.dumps([c["character"] for c in candidates if c["action"] == "Investigate"])
+            + ". If this list is empty, NO Investigate priority is permitted. "
+            "Do not use old patch complaints or backlog proposals to override it. "
+            "not_selected may explain any omitted in-scope character; include every Investigate candidate absent from your final priorities, not the selected candidates. "
+        )
+        history.append({"type": "user_input", "content": [{"type": "text", "text": final_constraints + "Return the final report in the supplied JSON schema, using only retrieved evidence. Do not add numerical rate/count claims in prose; exact values will be displayed from metric_refs."}]})
         run["model_requests"] += 1
         final = client.interactions.create(model=model, input=history, system_instruction=instructions,
                                            store=False, timeout=60, generation_config={"max_output_tokens": 8192},
@@ -373,6 +418,8 @@ def review(evidence: Evidence, api_key: str, model: str = DEFAULT_MODEL, *, clie
         except ValueError:
             run["validation_errors"] = ["Gemini did not return a report matching the required JSON schema."]
         run["status"] = "invalid" if run["validation_errors"] else "valid"
+        if run["report"]:
+            run["character_review"] = coverage_summary(evidence, run["report"])
     except ReviewLimitError as exc:
         run["status"], run["error"] = "error", str(exc)
     except Exception as exc:
@@ -407,18 +454,36 @@ def report_markdown(run: dict, evidence: Evidence) -> str:
              f"Model: {run['model']} | Run: {run['run_id']} | Status: {run['status']}", ""]
     if run["status"] != "valid":
         return "\n".join(lines + [run.get("error", "Report failed validation."), *run["validation_errors"]])
+    used = run.get("configuration")
+    if used:
+        lines += ["## Rules used", "", "| Rule | Value |", "| --- | --- |",
+                  f"| Win-rate range | {used['win_rate_min']:.1%}–{used['win_rate_max']:.1%} |",
+                  f"| Minimum appearances per group | {used['min_appearances']:,} |",
+                  f"| Pick-rate watch range | {used['pick_rate_min']:.1%}–{used['pick_rate_max']:.1%} |",
+                  f"| Ranking | {used['ranking']} |", f"| Scope | {used['scope']} |",
+                  f"| Patch | {used['current_update']} |", ""]
+    if run.get("coverage_warnings"):
+        lines += ["**Incomplete data — this is a partial review.**", *[f"- {w}" for w in run["coverage_warnings"]], ""]
     report = run["report"]
     lines.append(report["summary"])
     index = evidence.metric_index()
     for rank, p in enumerate(report["priorities"], 1):
-        lines += ["", f"## {rank}. {p['character']} — {p['action']}", "", p["rationale"], ""]
+        lines += ["", f"## {rank}. {p['character']} — {p['action']}", "",
+                  "Affected groups: " + ", ".join(p['affected_skill_groups']), "", p["rationale"], "",
+                  "| Skill group | Patch | Win rate | Wins | Appearances | Pick rate | Evidence reference |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
         for ref in p["metric_refs"]:
             r = index[ref]
             rate = f"{r['win_rate']:.2%}" if r["win_rate"] is not None else "unavailable"
             pick = f"{r['pick_rate']:.2%}" if r["pick_rate"] is not None else "unavailable"
-            lines.append(f"- {ref}: wins={r['wins']}, appearances={r['appearances']}, win rate={rate}, pick rate={pick}")
+            wins = f"{r['wins']:,.0f}" if r['wins'] is not None else "unavailable"
+            appearances = f"{r['appearances']:,.0f}" if r['appearances'] is not None else "unavailable"
+            lines.append(f"| {r['skill_group']} | {r['update']} | {rate} | {wins} | {appearances} | {pick} | {ref} |")
         lines += ["", f"Uncertainty: {p['uncertainty']}", "", f"Next step: {p['next_step']}", "",
                   f"Comment IDs: {', '.join(p['comment_ids']) or 'None'}", "",
                   f"Context IDs: {', '.join(p['context_refs']) or 'None'}"]
     lines += ["", "## Review notes", "", *[f"- {note}" for note in report["review_notes"]]]
+    lines += ["", "## Character coverage", ""]
+    for row in run.get("character_review", []):
+        lines.append(f"- {row['Character']} — {row['Disposition']}: {row['Reason']}")
     return "\n".join(lines)

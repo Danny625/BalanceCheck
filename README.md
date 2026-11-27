@@ -7,7 +7,7 @@ Team: Scott Shu, Elizabeth Hsu, Danny Weng.
 
 ## Current status
 
-The local app, Python metrics/evidence tools, Gemini agent loop, downloads, and evaluation runner are implemented. A live Flash-Lite practice run completed and passed report validation; no held-out model hit rate is claimed. The answer key is a draft for team review. This is not yet the complete midpoint submission.
+The working Streamlit app includes configurable review rules, complete roster coverage checks, ranked priorities, evidence, and downloadable run records. Live default-policy and custom-policy practice reviews passed validation. Software checks do not establish held-out model accuracy. See [final product updates and verification](docs/final_updates.md).
 
 ## Start here
 
@@ -25,9 +25,9 @@ The local app, Python metrics/evidence tools, Gemini agent loop, downloads, and 
 - [Shared app deployment](docs/deployment.md)
 - [Actual practice report](examples/practice/report.md)
 
-## Planned experience
+## Product experience
 
-Choose a sample scenario, click **Run review**, and receive zero to three ranked priorities with an action, affected skill groups, evidence references, uncertainty, and a next step. A simple upload mode will accept matching statistics and feedback CSVs for the supplied game.
+Choose a sample scenario, click **Run review**, and receive zero to three ranked priorities with an action, affected skill groups, evidence references, uncertainty, and a next step. Upload mode accepts matching statistics and feedback CSVs for the supplied game. Expand **Review rules** to change thresholds, ranking, or roster scope before running. Each report keeps its original settings; changing inputs shows a previous-review warning until you rerun.
 
 Python calculates the numbers. A hosted language model requests evidence through read-only Python functions and writes the report. A designer approves every investigation and game change.
 
@@ -102,7 +102,7 @@ stats.csv: character,update,skill_group,wins,appearances,picks,eligible_selectio
 feedback.csv: comment_id,author_id,character,update,skill_level,text
 ```
 
-Use Low/Mid/High groups and include current update 3.2. Leave missing counts blank. Missing denominators remain unavailable; impossible counts and unknown roster names produce input errors. Source CSVs are never overwritten.
+Use Low/Mid/High groups and patches 3.1/3.2, including current update 3.2. Leave missing counts blank. Missing denominators remain unavailable; impossible counts and unknown roster names produce input errors. Source CSVs are never overwritten. Missing expected characters/groups are shown before review and retained as explicit unavailable records. Reviews with gaps are marked partial.
 
 Reports include up to three priorities, exact Python evidence, uncertainty, and next steps. Failed evidence/schema validation is visibly unaccepted. Failed API calls never silently become baseline reports. Human review remains necessary for semantic correctness.
 
@@ -122,7 +122,7 @@ Software tests use test doubles and mock HTTP, not real model outputs. The basel
 
 The localhost link only works on the computer running the app. The private repository requires accepted collaborator invitations. Before midpoint handoff, arrange a working reviewer sandbox/credential and verify setup using only these instructions. A repository URL alone does not grant access.
 
-For a browser link without per-user keys, deploy this same repository to Streamlit Community Cloud, select `app.py`, and configure `GEMINI_API_KEY` in private app secrets. Deployment is optional and has not been performed. Never commit keys or put them in screenshots. The final handoff must include working access, not merely ask peers to find their own credentials.
+For a browser link without per-user keys, deploy this same repository to Streamlit Community Cloud, select `app.py`, and configure `GEMINI_API_KEY` in private app secrets. The team has deployed the app to Streamlit Community Cloud; this update was verified locally. Never commit keys or put them in screenshots. The final handoff must include working access, not merely ask peers to find their own credentials.
 
 ## Troubleshooting
 
@@ -135,6 +135,6 @@ For a browser link without per-user keys, deploy this same repository to Streaml
 | Invalid report | Download/preserve the original JSON; inspect validation errors before changing code or prompts. |
 | Upload rejected | Check column names, counts, roster, skill groups, and size. |
 
-GitHub stores the project; it does not run the app. The MVP will run locally from this repository. A hosted URL is optional because the assignment permits a repository with accessible instructions and credentials/sandbox where needed.
+GitHub stores the project; it does not run the app. The same app runs locally or on Streamlit Community Cloud. A hosted URL is optional because the assignment permits a repository with accessible instructions and credentials/sandbox where needed.
 
 See the [deployment walkthrough](docs/deployment.md) for one-time hosted setup. Visitors do not enter keys or select models; their requests share the configured project quota.

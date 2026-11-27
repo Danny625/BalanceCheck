@@ -3,12 +3,12 @@
 ## Observed implementation limits
 
 - Duplicate detection normalizes punctuation, whitespace, and case within the same author/character/update. It handles supplied punctuation variants but not general semantic paraphrases. Suspicious-comment labels also use heuristics.
-- Uploads support the bundled game/roster, not arbitrary games. Guide/threshold changes require reviewed code/rules updates. Synchronization checks confirm supported numeric values and guide tokens, not every sentence's meaning.
+- Uploads support the bundled game/roster, not arbitrary games. Thresholds, ranking, and roster scope are configurable; changes to game definitions or roster require reviewed code/reference updates. Synchronization checks confirm supported numeric values and guide tokens, not every sentence's meaning.
 - Automated report validation checks references, sample eligibility, actions, and some prohibited wording. It cannot prove every claim, ranking, or next step is sound, or catch every numerical-change formulation. Human scoring is mandatory.
 - Multiple model requests per review consume quota. Fixed round/tool limits may stop a repetitive model. API failures are preserved, not disguised as successful reports.
   The controller now moves directly to report generation once all required tools are complete, avoiding an extra model confirmation. This reduces requests but cannot remove Google's project limits. Quota errors preserve safe metric identifiers, limits, and retry delays when supplied; ambiguous errors remain explicitly ambiguous.
 - Numeric evidence is rendered directly from Python records instead of copied by the model. Interpretation errors remain possible.
-- The baseline places supported investigations ahead of data collection and monitoring. That mixed-action ordering is an explicit MVP interpretation for team review before evaluation.
+- The active policy places supported investigations ahead of data collection and monitoring. Python enforces this ordering. Player reach means the share of the player base in flagged skill groups, not observed character users or proven impact. The minimum appearance setting is an eligibility rule, not statistical confidence.
 - No live prompt-injection resilience claim is justified by offline tests. Suspicious comments remain labeled untrusted evidence so real-model behavior can be evaluated.
 - Raw runs contain synthetic comments and model outputs; local runs are ignored until selected for sharing. Keep uploaded inputs synthetic for this project.
 
@@ -32,3 +32,9 @@ The first practice attempts failed before any evidence tool ran. The original ge
 ## Successful practice run and observed repairs
 
 A controlled same-settings comparison found Flash-Lite responsive while Hydrogen and Flash returned HTTP 504. The full Flash-Lite practice run retrieved fourteen tools and passed validation. An earlier failed practice output skipped required context/comment retrieval and invented a patch reference; the controller now enforces those lookups. A later output correctly cited normal skill groups as comparisons but was rejected by an overly strict validator; eligibility checks now apply to affected groups, with regression coverage. Original model output is not silently repaired. See model_choice.md and examples/practice/ for evidence.
+
+## Final product development checks — November 27, 2026
+
+Whole-character and skill-group omissions are now detected against the selected expected roster. Default scope includes standard characters and observed test-queue characters; Entire roster also expects unobserved test-queue records. Reports remain partial when required counts are absent. Settings are isolated per browser session and copied into each run; they are not saved as shared studio defaults. Human approvals remain outside the app; there is no persistent approval audit trail. Streamlit server-local run files may not survive redeployment; download important records.
+
+Live practice development runs exposed both a round-limit failure from repeated individual lookups and reports that ignored custom rules or put Quill ahead of supported investigations. Batched tools and an explicit Python-calculated shortlist were added; validation continues to reject unsupported output instead of silently repairing it. A too-strict validator also rejected explanations for healthy omitted characters; it now permits them. Original attempts remain under ignored runs/. Successful runs do not establish a model hit rate. See final_updates.md for verification scope.

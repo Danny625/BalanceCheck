@@ -9,7 +9,7 @@ from data import DataError, load_scenario
 
 
 def example_report():
-    return {"summary": "Review Vex's current performance.", "review_notes": ["Player comments are context, not proof of a cause."],
+    return {"not_selected": [{"character": "Lyra", "reason": "Deferred for a separate designer review of healing context."}, {"character": "Brannoc", "reason": "Deferred for a separate High-group review."}], "summary": "Review Vex's current performance.", "review_notes": ["Player comments are context, not proof of a cause."],
             "priorities": [{"character": "Vex", "affected_skill_groups": ["Low", "Mid", "High"],
                             "action": "Investigate", "metric_refs": [f"stats:3.2:Vex:{g}" for g in ["Low", "Mid", "High"]],
                             "comment_ids": ["C012"], "context_refs": ["P32-02"], "rationale": "Performance is outside the expected range across skill groups.",
@@ -134,6 +134,7 @@ def test_healthy_group_comparisons_do_not_invalidate_high_only_investigation():
     body["priorities"][0].update(character="Brannoc", affected_skill_groups=["High"],
                                   metric_refs=[f"stats:3.2:Brannoc:{g}" for g in ["Low", "Mid", "High"]],
                                   comment_ids=["C013"], context_refs=["P32-03"])
+    body["not_selected"] = [{"character": c, "reason": "Deferred for a separate designer review."} for c in ["Vex", "Lyra"]]
     calls = [{"name": name, "arguments": args, "result": dispatch(e, name, args)} for name, args in [
         ("get_review_rules", {}), ("get_performance", {}), ("get_character_context", {"character": "Brannoc"}), ("get_feedback", {"character": "Brannoc"})]]
     assert not validate_report(Report.model_validate(body), e, calls)
